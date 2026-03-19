@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.calico.tutor.R
 import com.calico.tutor.ui.component.AuthButton
 import com.calico.tutor.ui.component.AuthTextField
-import com.calico.tutor.ui.theme.PrimaryYellow
+import com.calico.tutor.ui.theme.PrimaryOrange
 
 @Composable
 fun LoginScreen(
@@ -72,7 +72,7 @@ fun LoginScreen(
                 modifier = Modifier
                     .size(80.dp)
                     .background(
-                        color = PrimaryYellow,
+                        color = PrimaryOrange,
                         shape = RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -162,7 +162,7 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryYellow,
+                    containerColor = PrimaryOrange,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
@@ -193,7 +193,7 @@ fun LoginScreen(
                 TextButton(onClick = onRegisterClick) {
                     Text(
                         "Sign Up",
-                        color = PrimaryYellow,
+                        color = PrimaryOrange,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

@@ -35,7 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.calico.tutor.ui.component.AuthTextField
-import com.calico.tutor.ui.theme.PrimaryYellow
+import com.calico.tutor.ui.theme.PrimaryOrange
 
 @Composable
 fun RegisterScreen(
@@ -84,7 +84,7 @@ fun RegisterScreen(
                 modifier = Modifier
                     .size(80.dp)
                     .background(
-                        color = PrimaryYellow,
+                        color = PrimaryOrange,
                         shape = RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -212,7 +212,7 @@ fun RegisterScreen(
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryYellow,
+                    containerColor = PrimaryOrange,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && 
@@ -244,7 +244,7 @@ fun RegisterScreen(
                 TextButton(onClick = onBackClick) {
                     Text(
                         "Sign In",
-                        color = PrimaryYellow,
+                        color = PrimaryOrange,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

@@ -6,20 +6,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryYellow,
-    onPrimary = DarkGray,
-    primaryContainer = Color(0xFFFFF8E1),
-    onPrimaryContainer = Color(0xFF3F3000),
+    primary = PrimaryOrange,
+    onPrimary = WhiteBase,
+    primaryContainer = Color(0xFFFFECD9),
+    onPrimaryContainer = Color(0xFF3F2500),
     
-    secondary = SecondaryBlue,
+    secondary = SecondaryOrange,
     onSecondary = WhiteBase,
-    secondaryContainer = Color(0xFFE1F5FF),
-    onSecondaryContainer = Color(0xFF001A33),
+    secondaryContainer = Color(0xFFFFE5CC),
+    onSecondaryContainer = Color(0xFF4D2800),
     
-    tertiary = AccentPurple,
+    tertiary = AccentMagenta,
     onTertiary = WhiteBase,
-    tertiaryContainer = Color(0xFFF3E5F5),
-    onTertiaryContainer = Color(0xFF2D1B38),
+    tertiaryContainer = Color(0xFFF8D8E8),
+    onTertiaryContainer = Color(0xFF3D1F3D),
     
     error = ErrorRed,
     onError = WhiteBase,
