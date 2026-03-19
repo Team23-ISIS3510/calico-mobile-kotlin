@@ -16,9 +16,12 @@ fun AuthScreen(viewModel: AuthViewModel) {
     when (val state = authState.value) {
         is AuthState.Success -> {
             // Usuario autenticado - mostrar Home Page
+            val userName = state.token.idToken
+                .substringBefore("@")
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            
             HomeScreen(
-                userName = state.token.idToken.substringBefore("@")
-                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                userName = userName,
                 onLogout = {
                     viewModel.resetState()
                 },

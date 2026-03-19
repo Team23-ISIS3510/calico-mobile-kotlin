@@ -7,9 +7,9 @@ import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryOrange,
-    onPrimary = WhiteBase,
-    primaryContainer = Color(0xFFFFECD9),
-    onPrimaryContainer = Color(0xFF3F2500),
+    onPrimary = DarkGray,
+    primaryContainer = Color(0xFFFFF8E1),
+    onPrimaryContainer = Color(0xFF3F3000),
     
     secondary = SecondaryOrange,
     onSecondary = WhiteBase,

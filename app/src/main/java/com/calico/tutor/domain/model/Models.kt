@@ -1,9 +1,9 @@
 package com.calico.tutor.domain.model
 
 data class AuthToken(
-    val idToken: String,
-    val refreshToken: String,
-    val expiresIn: Long
+    val idToken: String = "user",
+    val refreshToken: String = "",
+    val expiresIn: Long = 3600
 )
 
 data class User(
