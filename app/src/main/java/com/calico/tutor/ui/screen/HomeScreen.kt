@@ -23,8 +23,7 @@ import com.calico.tutor.R
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
-import com.calico.tutor.domain.model.TutorSubjectAnalytics
-import com.calico.tutor.ui.component.TutorAnalyticsCard
+import com.calico.tutor.data.dto.response.TutorOccupancyData
 import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.*
@@ -39,8 +38,11 @@ fun HomeScreen(
 ) {
     var previousSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
     var upcomingSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
+    var occupancyData by remember { mutableStateOf<List<TutorOccupancyData>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isLoadingOccupancy by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var occupancyError by remember { mutableStateOf<String?>(null) }
     var tutorName by remember { mutableStateOf(userName) }
 
     LaunchedEffect(Unit) {
@@ -112,16 +114,15 @@ fun HomeScreen(
                 isLoading = false
             }
 
-            // Cargar analítica
+            // Load occupancy analytics
             try {
-                loadingAnalytics = true
-                val analyticsRepository = ServiceLocator.analyticsRepository(context)
-                val response = analyticsRepository.getTutoringDemandAnalytics()
-                analyticsData = response.analytics
-                loadingAnalytics = false
+                val subjectsApiService = ServiceLocator.subjectsApiService(context)
+                val occupancyResponse = subjectsApiService.getTutorOccupancy(tutorId)
+                occupancyData = occupancyResponse.data
+                isLoadingOccupancy = false
             } catch (e: Exception) {
-                errorAnalytics = e.message ?: "Failed to load analytics"
-                loadingAnalytics = false
+                occupancyError = "Error loading occupancy data: ${e.message}"
+                isLoadingOccupancy = false
             }
         }
     }
@@ -253,9 +254,30 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Analytics Section
+            // Logout Button
+            Button(
+                onClick = onLogout,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE0E0E0),
+                    contentColor = Color.Black
+                )
+            ) {
+                Text(
+                    text = "Logout",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Subject Occupancy Analytics Section
             Text(
-                text = "Volumen de Sesiones por Materia",
+                text = "Subject Occupancy Analytics",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -264,7 +286,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Comparación de demanda vs disponibilidad (últimos 2 años)",
+                text = "Sessions per hour and occupancy rate by subject",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray,
                 fontSize = 12.sp
@@ -272,8 +294,8 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Analytics Content
-            if (loadingAnalytics) {
+            // Occupancy Analytics Content
+            if (isLoadingOccupancy) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -282,27 +304,145 @@ fun HomeScreen(
                 ) {
                     CircularProgressIndicator(color = PrimaryOrange)
                 }
-            } else if (errorAnalytics != null) {
+            } else if (occupancyError != null) {
                 Text(
-                    text = "Logout",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    text = occupancyError ?: "Error loading occupancy data",
+                    color = Color.Red,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            } else if (analyticsData.isEmpty()) {
+            } else if (occupancyData.isEmpty()) {
                 Text(
-                    text = "No hay datos de analítica disponibles",
+                    text = "No occupancy data available",
                     color = MediumGray,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                analyticsData.forEach { tutorAnalytics ->
-                    TutorAnalyticsCard(analytics = tutorAnalytics)
-                    Spacer(modifier = Modifier.height(16.dp))
+                occupancyData.forEach { occupancy ->
+                    OccupancyCard(occupancy = occupancy)
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
 
+@Composable
+private fun OccupancyCard(occupancy: TutorOccupancyData) {
+    // Determine occupancy level indicator emoji
+    val occupancyIndicator = when {
+        occupancy.occupancyRate >= 75 -> "🔴"  // Overloaded (red)
+        occupancy.occupancyRate >= 50 -> "🟡"  // Medium (yellow)
+        else -> "🟢"                            // Available (green)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(elevation = 2.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Subject name and indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = occupancy.subject,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = occupancyIndicator,
+                    fontSize = 24.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Metrics row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Sessions per hour
+                Column {
+                    Text(
+                        text = "Sessions/Hour",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%.2f".format(occupancy.sessionsPerHour),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black
+                    )
+                }
+
+                // Occupancy rate
+                Column {
+                    Text(
+                        text = "Occupancy Rate",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%.1f%%".format(occupancy.occupancyRate),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryOrange
+                    )
+                }
+
+                // Total sessions
+                Column {
+                    Text(
+                        text = "Total Sessions",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = occupancy.totalSessions.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            // Occupancy progress bar
+            Spacer(modifier = Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { (occupancy.occupancyRate / 100.0).toFloat() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
+                color = when {
+                    occupancy.occupancyRate >= 75 -> Color(0xFFE53935)  // Red
+                    occupancy.occupancyRate >= 50 -> Color(0xFFFDD835)  // Yellow
+                    else -> Color(0xFF43A047)                             // Green
+                },
+                trackColor = Color(0xFFE0E0E0),
+            )
         }
     }
 }

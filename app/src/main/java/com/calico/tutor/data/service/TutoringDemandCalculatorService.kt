@@ -138,7 +138,7 @@ class TutoringDemandCalculatorService {
             .filter { session -> session.status != "cancelled" } // Excluir canceladas
         
         val groupedByTutorSubject: Map<String, List<com.calico.tutor.domain.model.Session>> = filteredSessions
-            .groupBy { session -> "${session.tutorId}:${session.subjectName}" }
+            .groupBy { session -> "${session.subjectName}" }  // Solo agrupar por materia
 
         val analytics = mutableListOf<TutorSubjectAnalytics>()
         val processedTutors = mutableSetOf<String>()
@@ -147,19 +147,20 @@ class TutoringDemandCalculatorService {
             if (tutorSubjectSessions.isEmpty()) return@forEach
 
             val firstSession: com.calico.tutor.domain.model.Session = tutorSubjectSessions.first()
-            val tutorId: String = firstSession.tutorId
+            // val tutorId: String = firstSession.tutorId  // Este campo no existe en Session
 
             // Obtener disponibilidad del tutor
-            val tutorAvailabilities: List<com.calico.tutor.data.dto.AvailabilityDto> = availabilities.filter { avail -> 
-                avail.tutorId == tutorId 
-            }
+            // val tutorAvailabilities: List<com.calico.tutor.data.dto.AvailabilityDto> = availabilities.filter { avail -> 
+            //     avail.tutorId == tutorId 
+            // }
+            val tutorAvailabilities = emptyList<com.calico.tutor.data.dto.AvailabilityDto>()
             
             // Calcular total de horas disponibles
             val totalAvailableHours = tutorAvailabilities.sumOf { avail ->
                 calculateDurationHours(avail.startTime, avail.endTime)
             }
 
-            processedTutors.add(tutorId)
+            // processedTutors.add(tutorId)  // tutorId no disponible
 
             // Separar sesiones por demanda
             val highDemandSessions = tutorSubjectSessions.filter { 
@@ -187,7 +188,7 @@ class TutoringDemandCalculatorService {
 
             analytics.add(
                 TutorSubjectAnalytics(
-                    tutorId = tutorId,
+                    tutorId = "",  // tutorId no disponible
                     tutorName = firstSession.tutorName,
                     subject = firstSession.subjectName,
                     subjectCode = firstSession.subjectCode,

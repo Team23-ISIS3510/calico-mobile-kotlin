@@ -37,33 +37,34 @@ class AnalyticsRepositoryImpl(
         }
         
         // Obtener todos los tutores únicos
-        val tutorIds: List<String> = sessions.map { it.tutorId }.distinct()
+        // val tutorIds: List<String> = sessions.map { it.tutorId }.distinct()
         
         // Obtener disponibilidad de cada tutor
-        val allAvailabilities: MutableList<com.calico.tutor.data.dto.AvailabilityDto> = mutableListOf()
-        for (tutorId: String in tutorIds) {
-            try {
-                val availabilityResponse = subjectsApiService.getAvailability(tutorId)
-                val tutorAvails = availabilityResponse.getAll()
-                allAvailabilities.addAll(tutorAvails)
-            } catch (e: Exception) {
-                // Si falla disponibilidad de un tutor, continuar con otros
-            }
-        }
+        // val allAvailabilities: MutableList<com.calico.tutor.data.dto.AvailabilityDto> = mutableListOf()
+        // for (tutorId: String in tutorIds) {
+        //     try {
+        //         val availabilityResponse = subjectsApiService.getAvailability(tutorId)
+        //         val tutorAvails = availabilityResponse.getAll()
+        //         allAvailabilities.addAll(tutorAvails)
+        //     } catch (e: Exception) {
+        //         // Si falla disponibilidad de un tutor, continuar con otros
+        //     }
+        // }
         
         // Calcular analítica
-        return calculator.calculateAnalytics(sessions, allAvailabilities)
+        return calculator.calculateAnalytics(sessions, emptyList())
     }
     
-    override suspend fun getTutorDemandAnalytics(tutorId: String): TutorAnalyticsResponse {
+    override suspend fun getTutorDemandAnalytics(tutorIdParam: String): TutorAnalyticsResponse {
         // Obtener rango de 2 años
         val (startDateStr, endDateStr) = calculator.getTwoYearsRange()
         
         // Obtener sesiones del rango
         val sessionsResponse = subjectsApiService.getSessionsByDateRange(startDateStr, endDateStr)
-        val sessions: List<com.calico.tutor.domain.model.Session> = sessionsResponse.sessions.filter { session ->
-            session.tutorId == tutorId
-        }
+        // val sessions: List<com.calico.tutor.domain.model.Session> = sessionsResponse.sessions.filter { session ->
+        //     session.tutorId == tutorIdParam
+        // }
+        val sessions = sessionsResponse.sessions
         
         if (sessions.isEmpty()) {
             return TutorAnalyticsResponse(
@@ -77,11 +78,11 @@ class AnalyticsRepositoryImpl(
         }
         
         // Obtener disponibilidad del tutor
-        val availabilityResponse = subjectsApiService.getAvailability(tutorId)
-        val availabilities = availabilityResponse.getAll()
+        // val availabilityResponse = subjectsApiService.getAvailability(tutorIdParam)
+        // val availabilities = availabilityResponse.getAll()
         
         // Calcular analítica
-        return calculator.calculateAnalytics(sessions, availabilities)
+        return calculator.calculateAnalytics(sessions, emptyList())
     }
 }
 
