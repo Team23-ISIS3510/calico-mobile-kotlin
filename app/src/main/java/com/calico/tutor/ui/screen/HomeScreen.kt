@@ -31,7 +31,7 @@ import java.util.*
 
 @Composable
 fun HomeScreen(
-    userName: String = "Usuario",
+    userName: String = "User",
     tutorId: String = "tutor@example.com",
     context: Context? = null,
     onLogout: () -> Unit = {},
@@ -39,53 +39,77 @@ fun HomeScreen(
 ) {
     var previousSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
     var upcomingSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
-    var loadingPrevious by remember { mutableStateOf(true) }
-    var loadingUpcoming by remember { mutableStateOf(true) }
-    var errorPrevious by remember { mutableStateOf<String?>(null) }
-    var errorUpcoming by remember { mutableStateOf<String?>(null) }
-    var analyticsData by remember { mutableStateOf<List<TutorSubjectAnalytics>>(emptyList()) }
-    var loadingAnalytics by remember { mutableStateOf(false) }
-    var errorAnalytics by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var tutorName by remember { mutableStateOf(userName) }
 
-    // Cargar datos cuando se monta el composable
     LaunchedEffect(Unit) {
         if (context != null) {
             try {
                 val subjectsApiService = ServiceLocator.subjectsApiService(context)
                 
-                // Cargar sesiones previas del tutor
+                // Load tutor profile to get the actual name
                 try {
-                    val prevResponse = subjectsApiService.getTutorSessionHistory(tutorId)
-                    previousSessions = prevResponse.sessions.take(2)
-                    loadingPrevious = false
+                    val tutorResponse = subjectsApiService.getTutorProfile(tutorId)
+                    tutorName = tutorResponse.name
                 } catch (e: Exception) {
-                    errorPrevious = "Error al cargar sesiones previas"
-                    loadingPrevious = false
+                    tutorName = userName
                 }
-
-                // Cargar sesiones próximas (rango de fechas: hoy a 30 días)
+                
+                // Load tutoring sessions for the tutor
                 try {
-                    val today = Calendar.getInstance()
-                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                    val startDate = dateFormat.format(today.time)
+                    val response = subjectsApiService.getTutoringSessionsForTutor(tutorId)
+                    val now = System.currentTimeMillis()
                     
-                    val endDate = Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_MONTH, 30)
+                    // Separate sessions into previous and upcoming based on scheduledStart
+                    val sessionList = response.sessions.map { sessionData ->
+                        val startTime = try {
+                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).parse(sessionData.scheduledStart)?.time ?: 0
+                        } catch (e: Exception) {
+                            try {
+                                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(sessionData.scheduledStart)?.time ?: 0
+                            } catch (e: Exception) {
+                                0
+                            }
+                        }
+                        
+                        Session(
+                            id = sessionData.id,
+                            scheduledStart = sessionData.scheduledStart,
+                            scheduledEnd = sessionData.scheduledEnd,
+                            status = sessionData.status,
+                            course = sessionData.course,
+                            courseId = sessionData.courseId,
+                            date = sessionData.scheduledStart,
+                            time = sessionData.scheduledStart,
+                            tutorName = "",
+                            subjectName = sessionData.course ?: sessionData.courseId ?: "Unknown",
+                            subjectCode = ""
+                        ) to startTime
                     }
-                    val endDateStr = dateFormat.format(endDate.time)
                     
-                    val upcomingResponse = subjectsApiService.getSessionsByDateRange(startDate, endDateStr)
-                    upcomingSessions = upcomingResponse.sessions.take(2)
-                    loadingUpcoming = false
+                    // Filter: Previous (scheduledStart < now), sorted descending, take last 2
+                    previousSessions = sessionList
+                        .filter { it.second < now }
+                        .sortedByDescending { it.second }
+                        .take(2)
+                        .map { it.first }
+                    
+                    // Filter: Upcoming (scheduledStart > now), sorted ascending, take next 2
+                    upcomingSessions = sessionList
+                        .filter { it.second > now }
+                        .sortedBy { it.second }
+                        .take(2)
+                        .map { it.first }
+                    
+                    isLoading = false
                 } catch (e: Exception) {
-                    errorUpcoming = "Error al cargar sesiones próximas"
-                    loadingUpcoming = false
+                    error = "Error loading sessions: ${e.message}"
+                    isLoading = false
                 }
             } catch (e: Exception) {
-                errorPrevious = "Error de conexión"
-                errorUpcoming = "Error de conexión"
-                loadingPrevious = false
-                loadingUpcoming = false
+                error = "Connection error: ${e.message}"
+                isLoading = false
             }
 
             // Cargar analítica
@@ -115,7 +139,7 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Logo Calico - Centrado
+            // Logo Calico - Centered
             Box(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -132,7 +156,7 @@ fun HomeScreen(
 
             // Welcome Message
             Text(
-                text = "BIENVENIDO A CALICO,\n$userName",
+                text = "WELCOME TO CALICO,\n$tutorName",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -153,7 +177,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (loadingUpcoming) {
+            if (isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -162,25 +186,21 @@ fun HomeScreen(
                 ) {
                     CircularProgressIndicator(color = PrimaryOrange)
                 }
-            } else if (errorUpcoming != null) {
+            } else if (error != null && upcomingSessions.isEmpty() && previousSessions.isEmpty()) {
                 Text(
-                    text = errorUpcoming ?: "Error",
+                    text = error ?: "Error",
                     color = Color.Red,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else if (upcomingSessions.isEmpty()) {
                 Text(
-                    text = "No hay sesiones próximas",
+                    text = "You do not have any upcoming tutoring sessions.",
                     color = MediumGray,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 upcomingSessions.forEach { session ->
-                    SessionCard(
-                        date = "${session.date} - ${session.time}",
-                        tutorName = session.tutorName,
-                        subject = "${session.subjectName} - ${session.subjectCode}"
-                    )
+                    SessionCard(session = session)
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
@@ -189,7 +209,7 @@ fun HomeScreen(
 
             // Previous Sessions Section
             Text(
-                text = "Previous sessions",
+                text = "Previous Sessions",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -197,34 +217,15 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (loadingPrevious) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = PrimaryOrange)
-                }
-            } else if (errorPrevious != null) {
+            if (previousSessions.isEmpty() && !isLoading) {
                 Text(
-                    text = errorPrevious ?: "Error",
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else if (previousSessions.isEmpty()) {
-                Text(
-                    text = "No hay sesiones previas",
+                    text = "You have not had any tutoring sessions yet.",
                     color = MediumGray,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 previousSessions.forEach { session ->
-                    SessionCard(
-                        date = "${session.date} - ${session.time}",
-                        tutorName = session.tutorName,
-                        subject = "${session.subjectName} - ${session.subjectCode}"
-                    )
+                    SessionCard(session = session)
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
@@ -244,13 +245,13 @@ fun HomeScreen(
                 )
             ) {
                 Text(
-                    text = "Materias recomendadas",
+                    text = "Recommended Subjects",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Analytics Section
             Text(
@@ -283,9 +284,9 @@ fun HomeScreen(
                 }
             } else if (errorAnalytics != null) {
                 Text(
-                    text = errorAnalytics ?: "Error",
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth()
+                    text = "Logout",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
                 )
             } else if (analyticsData.isEmpty()) {
                 Text(
@@ -307,11 +308,29 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SessionCard(
-    date: String,
-    tutorName: String,
-    subject: String
-) {
+private fun SessionCard(session: Session) {
+    // Format the date and time from scheduledStart
+    val dateTimeFormatter = try {
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+    } catch (e: Exception) {
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    }
+    
+    val displayFormatter = SimpleDateFormat("MMM d, yyyy - h:mm a", Locale.getDefault())
+    
+    val formattedDateTime = try {
+        val date = dateTimeFormatter.parse(session.scheduledStart)
+        if (date != null) {
+            displayFormatter.format(date)
+        } else {
+            "Date TBD"
+        }
+    } catch (e: Exception) {
+        "Date TBD"
+    }
+    
+    val courseName = session.course ?: session.courseId ?: "Unknown Course"
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -330,21 +349,21 @@ private fun SessionCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = date,
+                    text = formattedDateTime,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = tutorName,
+                    text = courseName,
                     style = MaterialTheme.typography.labelSmall,
                     color = PrimaryOrange,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = subject,
+                    text = "Status: ${session.status}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MediumGray
                 )

@@ -20,6 +20,7 @@ class AuthRepositoryImpl(
             val response = authApiService.login(request)
             val authToken = AuthMapper.toAuthToken(response)
             tokenManager.saveToken(authToken.idToken, authToken.refreshToken, authToken.expiresIn)
+            tokenManager.saveEmail(email)
             Result.Success(authToken)
         } catch (e: Exception) {
             Result.Error(e, e.localizedMessage ?: "Login failed")
@@ -46,6 +47,7 @@ class AuthRepositoryImpl(
             val response = authApiService.register(request)
             val authToken = AuthMapper.toAuthToken(response)
             tokenManager.saveToken(authToken.idToken, authToken.refreshToken, authToken.expiresIn)
+            tokenManager.saveEmail(email)
             Result.Success(authToken)
         } catch (e: Exception) {
             Result.Error(e, e.localizedMessage ?: "Registration failed")

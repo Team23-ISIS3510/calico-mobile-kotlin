@@ -15,7 +15,7 @@ import com.calico.tutor.domain.usecase.RegisterUseCase
 
 object ServiceLocator {
     @Volatile
-    private var tokenManager: TokenManager? = null
+    private var _tokenManager: TokenManager? = null
     @Volatile
     private var authApiService: AuthApiService? = null
     @Volatile
@@ -25,9 +25,9 @@ object ServiceLocator {
     @Volatile
     private var analyticsRepository: AnalyticsRepository? = null
 
-    private fun tokenManager(context: Context): TokenManager {
-        return tokenManager ?: synchronized(this) {
-            tokenManager ?: TokenManager(context.applicationContext).also { tokenManager = it }
+    private fun getTokenManager(context: Context): TokenManager {
+        return _tokenManager ?: synchronized(this) {
+            _tokenManager ?: TokenManager(context.applicationContext).also { _tokenManager = it }
         }
     }
 
@@ -35,7 +35,7 @@ object ServiceLocator {
         return authApiService ?: synchronized(this) {
             authApiService ?: RetrofitClient.createAuthApiService(
                 RetrofitClient.createRetrofit(
-                    RetrofitClient.createHttpClientWithTokenManager(tokenManager(context))
+                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
                 )
             ).also { authApiService = it }
         }
@@ -45,7 +45,7 @@ object ServiceLocator {
         return authRepository ?: synchronized(this) {
             authRepository ?: AuthRepositoryImpl(
                 authApiService = authApiService(context),
-                tokenManager = tokenManager(context)
+                tokenManager = getTokenManager(context)
             ).also { authRepository = it }
         }
     }
@@ -54,7 +54,7 @@ object ServiceLocator {
         return subjectsApiService ?: synchronized(this) {
             subjectsApiService ?: RetrofitClient.createSubjectsApiService(
                 RetrofitClient.createRetrofit(
-                    RetrofitClient.createHttpClientWithTokenManager(tokenManager(context))
+                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
                 )
             ).also { subjectsApiService = it }
         }
@@ -74,4 +74,8 @@ object ServiceLocator {
 
     fun getAuthTokenUseCase(context: Context): GetAuthTokenUseCase =
         GetAuthTokenUseCase(authRepository(context))
+
+    // Expose TokenManager publicly
+    fun provideTokenManager(context: Context): TokenManager =
+        getTokenManager(context)
 }

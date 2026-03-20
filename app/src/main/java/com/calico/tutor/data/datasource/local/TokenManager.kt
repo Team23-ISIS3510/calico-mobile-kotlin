@@ -26,6 +26,15 @@ class TokenManager(private val context: Context) {
         }
     }
 
+    fun saveEmail(email: String) {
+        encryptedSharedPreferences.edit().apply {
+            putString(KEY_EMAIL, email)
+            apply()
+        }
+    }
+
+    fun getEmail(): String? = encryptedSharedPreferences.getString(KEY_EMAIL, null)
+
     fun getIdToken(): String? = encryptedSharedPreferences.getString(KEY_ID_TOKEN, null)
 
     fun getRefreshToken(): String? = encryptedSharedPreferences.getString(KEY_REFRESH_TOKEN, null)
@@ -37,6 +46,7 @@ class TokenManager(private val context: Context) {
             remove(KEY_ID_TOKEN)
             remove(KEY_REFRESH_TOKEN)
             remove(KEY_EXPIRES_IN)
+            remove(KEY_EMAIL)
             apply()
         }
     }
@@ -46,6 +56,7 @@ class TokenManager(private val context: Context) {
     companion object {
         private const val PREFS_NAME = "calico_auth_prefs"
         private const val KEY_ID_TOKEN = "id_token"
+        private const val KEY_EMAIL = "email"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_EXPIRES_IN = "expires_in"
     }
