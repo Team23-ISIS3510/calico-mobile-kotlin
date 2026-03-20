@@ -26,12 +26,17 @@ data class SubjectsHistory(
 )
 
 data class Session(
-    val id: String,
-    val date: String,
-    val time: String,
-    val tutorName: String,
-    val subjectName: String,
-    val subjectCode: String
+    val id: String = "",
+    val scheduledStart: String = "",
+    val scheduledEnd: String = "",
+    val status: String = "",
+    val course: String? = null,
+    val courseId: String? = null,
+    val date: String = "",
+    val time: String = "",
+    val tutorName: String = "",
+    val subjectName: String = "",
+    val subjectCode: String = ""
 )
 
 data class SessionHistory(

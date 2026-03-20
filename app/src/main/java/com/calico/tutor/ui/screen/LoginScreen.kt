@@ -47,7 +47,6 @@ import com.calico.tutor.ui.theme.PrimaryOrange
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit,
     onRegisterClick: () -> Unit,
-    onDemoClick: () -> Unit = {},
     isLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
@@ -205,27 +204,6 @@ fun LoginScreen(
                     "Forgot Password?",
                     color = BrownText,
                     fontSize = 14.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Demo Button
-            Button(
-                onClick = onDemoClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE0E0E0),
-                    contentColor = Color.Black
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    "View Home Demo",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
                 )
             }
 

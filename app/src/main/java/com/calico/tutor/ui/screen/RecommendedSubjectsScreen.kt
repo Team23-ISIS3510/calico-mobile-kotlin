@@ -36,11 +36,38 @@ fun RecommendedSubjectsScreen(
         try {
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
-            // Tomar las 3 materias con mayor historial
-            subjects = response.subjects.sortedByDescending { it.count }.take(3)
+            
+            // Process data from the endpoint
+            if (response.data != null) {
+                // Group by courseId and course to get unique subjects
+                val courseMap = mutableMapOf<String, Pair<String, Int>>()
+                
+                response.data.forEach { courseData ->
+                    val courseId = courseData.courseId
+                    val courseName = courseData.course ?: "Unnamed"
+                    
+                    if (courseMap.containsKey(courseId)) {
+                        val (name, count) = courseMap[courseId]!!
+                        courseMap[courseId] = Pair(name, count + 1)
+                    } else {
+                        courseMap[courseId] = Pair(courseName, 1)
+                    }
+                }
+                
+                // Convert to Subject and sort by frequency (top 3)
+                subjects = courseMap.entries.map { (courseId, nameAndCount) ->
+                    Subject(
+                        id = courseId,
+                        name = nameAndCount.first,
+                        code = courseId.take(4).uppercase(),
+                        count = nameAndCount.second
+                    )
+                }.sortedByDescending { it.count }.take(3)
+            }
+            
             isLoading = false
         } catch (e: Exception) {
-            error = "Error al cargar las materias: ${e.message}"
+            error = "Error loading subjects: ${e.message}"
             isLoading = false
         }
     }
@@ -76,12 +103,12 @@ fun RecommendedSubjectsScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
+                                contentDescription = "Back",
                                 tint = OnSurface
                             )
                         }
                         Text(
-                            text = "Materias Recomendadas",
+                            text = "Recommended Subjects",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = OnSurface
@@ -122,7 +149,7 @@ fun RecommendedSubjectsScreen(
                         )
                     ) {
                         Text(
-                            text = error ?: "Error desconocido",
+                            text = error ?: "Unknown error",
                             modifier = Modifier.padding(16.dp),
                             color = Color(0xFFC62828),
                             fontWeight = FontWeight.Medium
@@ -139,7 +166,7 @@ fun RecommendedSubjectsScreen(
                         )
                     ) {
                         Text(
-                            text = "No hay materias recomendadas disponibles",
+                            text = "No recommended subjects available",
                             modifier = Modifier.padding(16.dp),
                             color = MediumGray,
                             fontWeight = FontWeight.Medium
@@ -147,7 +174,7 @@ fun RecommendedSubjectsScreen(
                     }
                 } else {
                     Text(
-                        text = "Top 3 Materias Más Solicitadas",
+                        text = "Top 3 Recommended Subjects",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = OnSurface
@@ -188,7 +215,7 @@ fun RecommendedSubjectsScreen(
                         enabled = selectedSubjects.isNotEmpty()
                     ) {
                         Text(
-                            text = "Aplica ya",
+                            text = "Apply Now",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -232,13 +259,13 @@ private fun RecommendedSubjectItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Código: ${subject.code}",
+                    text = "Code: ${subject.code}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MediumGray
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "${subject.count} estudiantes interesados",
+                    text = "${subject.count} students interested",
                     style = MaterialTheme.typography.labelSmall,
                     color = PrimaryOrange,
                     fontWeight = FontWeight.SemiBold
