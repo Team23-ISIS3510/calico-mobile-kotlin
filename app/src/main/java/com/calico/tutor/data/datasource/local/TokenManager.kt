@@ -33,7 +33,16 @@ class TokenManager(private val context: Context) {
         }
     }
 
+    fun saveFirebaseUid(uid: String) {
+        encryptedSharedPreferences.edit().apply {
+            putString(KEY_FIREBASE_UID, uid)
+            apply()
+        }
+    }
+
     fun getEmail(): String? = encryptedSharedPreferences.getString(KEY_EMAIL, null)
+
+    fun getFirebaseUid(): String? = encryptedSharedPreferences.getString(KEY_FIREBASE_UID, null)
 
     fun getIdToken(): String? = encryptedSharedPreferences.getString(KEY_ID_TOKEN, null)
 
@@ -47,6 +56,7 @@ class TokenManager(private val context: Context) {
             remove(KEY_REFRESH_TOKEN)
             remove(KEY_EXPIRES_IN)
             remove(KEY_EMAIL)
+            remove(KEY_FIREBASE_UID)
             apply()
         }
     }
@@ -57,6 +67,7 @@ class TokenManager(private val context: Context) {
         private const val PREFS_NAME = "calico_auth_prefs"
         private const val KEY_ID_TOKEN = "id_token"
         private const val KEY_EMAIL = "email"
+        private const val KEY_FIREBASE_UID = "firebase_uid"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_EXPIRES_IN = "expires_in"
     }

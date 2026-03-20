@@ -21,17 +21,12 @@ import com.calico.tutor.domain.model.Subject
 import com.calico.tutor.ui.theme.*
 import android.content.Context
 
-data class SubjectFrequency(
-    val subject: Subject,
-    val frequency: Int
-)
-
 @Composable
 fun TopSubjectsScreen(
     context: Context,
     onNavigateBack: () -> Unit = {}
 ) {
-    var topSubjects by remember { mutableStateOf<List<SubjectFrequency>>(emptyList()) }
+    var topSubjects by remember { mutableStateOf<List<Pair<Subject, Int>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -42,37 +37,37 @@ fun TopSubjectsScreen(
             
             // Process data from the endpoint
             if (response.data != null) {
-                // Group by courseId to get frequencies
-                val courseFrequencyMap = mutableMapOf<String, Pair<String, Int>>()
+                // Group by courseId and count frequency
+                val courseMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
                     val courseId = courseData.courseId
                     val courseName = courseData.course ?: "Unnamed"
                     
-                    if (courseFrequencyMap.containsKey(courseId)) {
-                        val (name, count) = courseFrequencyMap[courseId]!!
-                        courseFrequencyMap[courseId] = Pair(name, count + 1)
+                    if (courseMap.containsKey(courseId)) {
+                        val (name, count) = courseMap[courseId]!!
+                        courseMap[courseId] = Pair(name, count + 1)
                     } else {
-                        courseFrequencyMap[courseId] = Pair(courseName, 1)
+                        courseMap[courseId] = Pair(courseName, 1)
                     }
                 }
                 
-                // Convert to SubjectFrequency and sort by frequency (top 3)
-                topSubjects = courseFrequencyMap.entries.map { (courseId, nameAndCount) ->
+                // Convert to Subject and sort by frequency (top 3)
+                topSubjects = courseMap.entries.map { (courseId, nameAndCount) ->
                     val subject = Subject(
                         id = courseId,
                         name = nameAndCount.first,
-                        code = courseId.take(4).uppercase(),
+                        code = "",
                         count = nameAndCount.second
                     )
-                    SubjectFrequency(subject, nameAndCount.second)
-                }.sortedByDescending { it.frequency }
+                    Pair(subject, nameAndCount.second)
+                }.sortedByDescending { it.second }
                     .take(3)
             }
             
             isLoading = false
         } catch (e: Exception) {
-            error = "Error loading subjects: ${e.message}"
+            error = "Error loading subjects"
             isLoading = false
         }
     }
@@ -169,11 +164,11 @@ fun TopSubjectsScreen(
                         )
                     }
                 } else {
-                    topSubjects.forEachIndexed { index, subjectFreq ->
+                    topSubjects.forEachIndexed { index, (subject, frequency) ->
                         TopSubjectCard(
                             ranking = index + 1,
-                            subject = subjectFreq.subject.name,
-                            frequency = subjectFreq.frequency
+                            subject = subject.name,
+                            frequency = frequency
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                     }

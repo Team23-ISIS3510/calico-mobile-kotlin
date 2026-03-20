@@ -9,8 +9,8 @@ data class TutoringSessionsResponse(
     val tutorId: String = "",
     @SerializedName("count")
     val count: Int = 0,
-    @SerializedName("data")
-    val data: List<TutoringSessionData> = emptyList()
+    @SerializedName("sessions")
+    val sessions: List<TutoringSessionData> = emptyList()
 )
 
 data class TutoringSessionData(

@@ -1,6 +1,7 @@
 package com.calico.tutor.ui.screen
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.compose.runtime.remember
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
+import com.calico.tutor.util.JwtUtils
 
 @Composable
 fun AuthScreen(viewModel: AuthViewModel, context: Context) {
@@ -21,6 +23,22 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
             // Usuario autenticado - mostrar Home Page
             val tokenManager = ServiceLocator.provideTokenManager(context)
             val email = tokenManager.getEmail() ?: state.token.idToken
+            
+            // Extraer Firebase UID del JWT token
+            val firebaseUid = try {
+                val idToken = state.token.idToken ?: tokenManager.getIdToken() ?: ""
+                JwtUtils.extractFirebaseUid(idToken).also { uid ->
+                    if (uid != null) {
+                        // Guardar el Firebase UID en TokenManager para uso futuro
+                        tokenManager.saveFirebaseUid(uid)
+                        Log.d("AuthScreen", "✅ Firebase UID guardado: $uid")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AuthScreen", "❌ Error al extraer Firebase UID: ${e.message}")
+                null
+            } ?: tokenManager.getFirebaseUid() // Fallback: intentar obtener del almacenamiento
+            
             val userName = email
                 .substringBefore("@")
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
@@ -35,7 +53,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                 else -> {
                     HomeScreen(
                         userName = userName,
-                        tutorId = email,
+                        tutorId = firebaseUid ?: email, // Usar Firebase UID, fallback a email
                         context = context,
                         onLogout = {
                             viewModel.resetState()
