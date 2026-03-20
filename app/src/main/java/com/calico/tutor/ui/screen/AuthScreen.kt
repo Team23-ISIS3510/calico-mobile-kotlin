@@ -1,5 +1,6 @@
 package com.calico.tutor.ui.screen
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -8,9 +9,37 @@ import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
 
 @Composable
-fun AuthScreen(viewModel: AuthViewModel) {
+fun AuthScreen(viewModel: AuthViewModel, context: Context) {
     val authState = viewModel.authState.collectAsState()
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
+    val (demoMode, setDemoMode) = remember { mutableStateOf(false) }
+    val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
+
+    // Si está en modo demo, mostrar HomeScreen demo
+    if (demoMode) {
+        when (currentScreen) {
+            "topSubjects" -> {
+                TopSubjectsScreen(
+                    context = context,
+                    onNavigateBack = { setCurrentScreen("home") }
+                )
+            }
+            else -> {
+                HomeScreen(
+                    userName = "Demo User",
+                    tutorId = "demo@example.com",
+                    context = context,
+                    onLogout = {
+                        setDemoMode(false)
+                    },
+                    onNavigateToTopSubjects = {
+                        setCurrentScreen("topSubjects")
+                    }
+                )
+            }
+        }
+        return
+    }
 
     // Si el usuario está autenticado, mostrar HomeScreen
     when (val state = authState.value) {
@@ -19,22 +48,29 @@ fun AuthScreen(viewModel: AuthViewModel) {
             val userName = state.token.idToken
                 .substringBefore("@")
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            val tutorId = state.token.idToken
             
-            HomeScreen(
-                userName = userName,
-                onLogout = {
-                    viewModel.resetState()
-                },
-                onNavigateToSearch = {
-                    // Aquí irá la navegación a búsqueda
-                },
-                onNavigateToProfile = {
-                    // Aquí irá la navegación a perfil
-                },
-                onNavigateToHistory = {
-                    // Aquí irá la navegación a historial
+            when (currentScreen) {
+                "topSubjects" -> {
+                    TopSubjectsScreen(
+                        context = context,
+                        onNavigateBack = { setCurrentScreen("home") }
+                    )
                 }
-            )
+                else -> {
+                    HomeScreen(
+                        userName = userName,
+                        tutorId = tutorId,
+                        context = context,
+                        onLogout = {
+                            viewModel.resetState()
+                        },
+                        onNavigateToTopSubjects = {
+                            setCurrentScreen("topSubjects")
+                        }
+                    )
+                }
+            }
         }
         else -> {
             // Mostrar Login o Register según el estado
@@ -45,6 +81,7 @@ fun AuthScreen(viewModel: AuthViewModel) {
                         viewModel.login(email, password)
                     },
                     onRegisterClick = { setShowLogin(false) },
+                    onDemoClick = { setDemoMode(true) },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
                     isRetryable = errorState?.retryable == true,

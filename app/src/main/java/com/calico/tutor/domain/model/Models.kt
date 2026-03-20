@@ -13,3 +13,27 @@ data class User(
     val isTutor: Boolean,
     val courses: List<String>? = null
 )
+
+data class Subject(
+    val id: String,
+    val name: String,
+    val code: String,
+    val count: Int
+)
+
+data class SubjectsHistory(
+    val subjects: List<Subject>
+)
+
+data class Session(
+    val id: String,
+    val date: String,
+    val time: String,
+    val tutorName: String,
+    val subjectName: String,
+    val subjectCode: String
+)
+
+data class SessionHistory(
+    val sessions: List<Session>
+)

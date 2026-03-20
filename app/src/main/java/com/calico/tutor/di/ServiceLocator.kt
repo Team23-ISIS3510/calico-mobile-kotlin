@@ -3,6 +3,7 @@ package com.calico.tutor.di
 import android.content.Context
 import com.calico.tutor.data.datasource.local.TokenManager
 import com.calico.tutor.data.datasource.remote.AuthApiService
+import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.domain.repository.AuthRepository
@@ -15,6 +16,8 @@ object ServiceLocator {
     private var tokenManager: TokenManager? = null
     @Volatile
     private var authApiService: AuthApiService? = null
+    @Volatile
+    private var subjectsApiService: SubjectsApiService? = null
     @Volatile
     private var authRepository: AuthRepository? = null
 
@@ -40,6 +43,16 @@ object ServiceLocator {
                 authApiService = authApiService(context),
                 tokenManager = tokenManager(context)
             ).also { authRepository = it }
+        }
+    }
+
+    fun subjectsApiService(context: Context): SubjectsApiService {
+        return subjectsApiService ?: synchronized(this) {
+            subjectsApiService ?: RetrofitClient.createSubjectsApiService(
+                RetrofitClient.createRetrofit(
+                    RetrofitClient.createHttpClientWithTokenManager(tokenManager(context))
+                )
+            ).also { subjectsApiService = it }
         }
     }
 

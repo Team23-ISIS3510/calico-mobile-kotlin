@@ -23,6 +23,10 @@ object RetrofitClient {
         return retrofit.create(AuthApiService::class.java)
     }
 
+    fun createSubjectsApiService(retrofit: Retrofit): SubjectsApiService {
+        return retrofit.create(SubjectsApiService::class.java)
+    }
+
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {
         return createHttpClient(tokenManager)
     }
