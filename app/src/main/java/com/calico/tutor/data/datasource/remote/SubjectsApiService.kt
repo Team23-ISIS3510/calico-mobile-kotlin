@@ -2,6 +2,7 @@ package com.calico.tutor.data.datasource.remote
 
 import com.calico.tutor.domain.model.SubjectsHistory
 import com.calico.tutor.domain.model.SessionHistory
+import com.calico.tutor.data.dto.AvailabilityResponseDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -18,4 +19,9 @@ interface SubjectsApiService {
         @Query("startDate") startDate: String,
         @Query("endDate") endDate: String
     ): SessionHistory
+
+    @GET("availability")
+    suspend fun getAvailability(
+        @Query("tutorId") tutorId: String? = null
+    ): AvailabilityResponseDto
 }

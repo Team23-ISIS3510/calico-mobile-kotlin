@@ -31,7 +31,9 @@ data class Session(
     val time: String,
     val tutorName: String,
     val subjectName: String,
-    val subjectCode: String
+    val subjectCode: String,
+    val tutorId: String = "",
+    val status: String = "completed"
 )
 
 data class SessionHistory(

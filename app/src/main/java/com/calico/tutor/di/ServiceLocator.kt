@@ -6,7 +6,9 @@ import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.repository.AuthRepositoryImpl
+import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
 import com.calico.tutor.domain.repository.AuthRepository
+import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
@@ -20,6 +22,8 @@ object ServiceLocator {
     private var subjectsApiService: SubjectsApiService? = null
     @Volatile
     private var authRepository: AuthRepository? = null
+    @Volatile
+    private var analyticsRepository: AnalyticsRepository? = null
 
     private fun tokenManager(context: Context): TokenManager {
         return tokenManager ?: synchronized(this) {
@@ -53,6 +57,14 @@ object ServiceLocator {
                     RetrofitClient.createHttpClientWithTokenManager(tokenManager(context))
                 )
             ).also { subjectsApiService = it }
+        }
+    }
+
+    fun analyticsRepository(context: Context): AnalyticsRepository {
+        return analyticsRepository ?: synchronized(this) {
+            analyticsRepository ?: AnalyticsRepositoryImpl(
+                subjectsApiService = subjectsApiService(context)
+            ).also { analyticsRepository = it }
         }
     }
 

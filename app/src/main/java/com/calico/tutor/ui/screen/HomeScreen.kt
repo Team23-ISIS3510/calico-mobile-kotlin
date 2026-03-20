@@ -23,6 +23,8 @@ import com.calico.tutor.R
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
+import com.calico.tutor.domain.model.TutorSubjectAnalytics
+import com.calico.tutor.ui.component.TutorAnalyticsCard
 import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.*
@@ -41,6 +43,9 @@ fun HomeScreen(
     var loadingUpcoming by remember { mutableStateOf(true) }
     var errorPrevious by remember { mutableStateOf<String?>(null) }
     var errorUpcoming by remember { mutableStateOf<String?>(null) }
+    var analyticsData by remember { mutableStateOf<List<TutorSubjectAnalytics>>(emptyList()) }
+    var loadingAnalytics by remember { mutableStateOf(false) }
+    var errorAnalytics by remember { mutableStateOf<String?>(null) }
 
     // Cargar datos cuando se monta el composable
     LaunchedEffect(Unit) {
@@ -81,6 +86,18 @@ fun HomeScreen(
                 errorUpcoming = "Error de conexión"
                 loadingPrevious = false
                 loadingUpcoming = false
+            }
+
+            // Cargar analítica
+            try {
+                loadingAnalytics = true
+                val analyticsRepository = ServiceLocator.analyticsRepository(context)
+                val response = analyticsRepository.getTutoringDemandAnalytics()
+                analyticsData = response.analytics
+                loadingAnalytics = false
+            } catch (e: Exception) {
+                errorAnalytics = e.message ?: "Failed to load analytics"
+                loadingAnalytics = false
             }
         }
     }
@@ -235,26 +252,56 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Logout Button
-            Button(
-                onClick = onLogout,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE0E0E0),
-                    contentColor = Color.Black
-                )
-            ) {
+            // Analytics Section
+            Text(
+                text = "Volumen de Sesiones por Materia",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Comparación de demanda vs disponibilidad (últimos 2 años)",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray,
+                fontSize = 12.sp
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Analytics Content
+            if (loadingAnalytics) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = PrimaryOrange)
+                }
+            } else if (errorAnalytics != null) {
                 Text(
-                    text = "Cerrar sesión",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    text = errorAnalytics ?: "Error",
+                    color = Color.Red,
+                    modifier = Modifier.fillMaxWidth()
                 )
+            } else if (analyticsData.isEmpty()) {
+                Text(
+                    text = "No hay datos de analítica disponibles",
+                    color = MediumGray,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                analyticsData.forEach { tutorAnalytics ->
+                    TutorAnalyticsCard(analytics = tutorAnalytics)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
         }
     }
 }
