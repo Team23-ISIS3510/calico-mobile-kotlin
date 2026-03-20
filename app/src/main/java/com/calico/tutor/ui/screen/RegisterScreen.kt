@@ -227,10 +227,13 @@ fun RegisterScreen(
                 )
             }
 
-            if (errorMessage != null) {
+            val (validationError, setValidationError) = remember { mutableStateOf<String?>(null) }
+            val combinedErrorMessage = validationError ?: errorMessage
+
+            if (combinedErrorMessage != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    errorMessage,
+                    combinedErrorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
@@ -241,7 +244,33 @@ fun RegisterScreen(
 
             // Register Button
             Button(
-                onClick = { onRegisterClick(email, password, name, phone, isTutor) },
+                onClick = {
+                    // Basic client-side validation before attempting registration
+                    val trimmedEmail = email.trim()
+                    val trimmedName = name.trim()
+                    val trimmedPhone = phone.trim()
+
+                    val localError = when {
+                        trimmedEmail.isEmpty() ||
+                            !trimmedEmail.contains("@") ||
+                            !trimmedEmail.contains(".") ->
+                            "Please enter a valid email address."
+                        password.length < 6 ->
+                            "Password must be at least 6 characters long."
+                        trimmedName.length < 2 ->
+                            "Please enter your full name."
+                        trimmedPhone.length < 10 ->
+                            "Please enter a valid phone number."
+                        else -> null
+                    }
+
+                    if (localError != null) {
+                        setValidationError(localError)
+                    } else {
+                        setValidationError(null)
+                        onRegisterClick(trimmedEmail, password, trimmedName, trimmedPhone, isTutor)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
