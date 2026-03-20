@@ -46,7 +46,9 @@ import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
+import com.calico.tutor.ui.theme.TextColorBlack
 
 @Composable
 fun RegisterScreen(
@@ -67,7 +69,7 @@ fun RegisterScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(MainBackground)
     ) {
         Column(
             modifier = Modifier
@@ -85,7 +87,7 @@ fun RegisterScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.Black
+                        tint = TextColorBlack
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -121,8 +123,8 @@ fun RegisterScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black
+                    focusedTextColor = TextColorBlack,
+                    unfocusedTextColor = TextColorBlack
                 ),
                 singleLine = true
             )

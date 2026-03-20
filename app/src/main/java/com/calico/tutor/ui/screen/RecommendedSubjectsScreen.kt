@@ -145,13 +145,13 @@ fun RecommendedSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFFEBEE)
+                            containerColor = ErrorCardBackground
                         )
                     ) {
                         Text(
                             text = error ?: "Unknown error",
                             modifier = Modifier.padding(16.dp),
-                            color = Color(0xFFC62828),
+                            color = ErrorCardText,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -240,7 +240,7 @@ private fun RecommendedSubjectItem(
             .shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFFFFF3E0) else Surface
+            containerColor = if (isSelected) CalicoBulletColor else Surface
         )
     ) {
         Row(

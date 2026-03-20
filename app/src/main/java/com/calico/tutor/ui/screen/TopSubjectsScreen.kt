@@ -80,7 +80,7 @@ fun TopSubjectsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(WhiteBase)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -90,7 +90,7 @@ fun TopSubjectsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(elevation = 4.dp),
-                color = Color.White
+                color = WhiteBase
             ) {
                 Row(
                     modifier = Modifier
@@ -102,7 +102,7 @@ fun TopSubjectsScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.Black
+                            tint = TextColorBlack
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -110,7 +110,7 @@ fun TopSubjectsScreen(
                         text = "Top 3 Subjects",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = OnSurface
                     )
                 }
             }
@@ -141,13 +141,13 @@ fun TopSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFFEBEE)
+                            containerColor = ErrorCardBackground
                         )
                     ) {
                         Text(
                             text = error ?: "Unknown error",
                             modifier = Modifier.padding(16.dp),
-                            color = Color(0xFFC62828),
+                            color = ErrorCardText,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -158,7 +158,7 @@ fun TopSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF5F5F5)
+                            containerColor = SurfaceVariant
                         )
                     ) {
                         Text(

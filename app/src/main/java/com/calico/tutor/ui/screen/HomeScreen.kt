@@ -64,7 +64,7 @@ fun HomeScreen(
                     val now = System.currentTimeMillis()
                     
                     // Separate sessions into previous and upcoming based on scheduledStart
-                    val sessionList = response.sessions.map { sessionData ->
+                    val sessionList = response.data.map { sessionData ->
                         val startTime = try {
                             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).parse(sessionData.scheduledStart)?.time ?: 0
                         } catch (e: Exception) {
@@ -130,7 +130,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(WhiteBase)
     ) {
         Column(
             modifier = Modifier
@@ -213,7 +213,7 @@ fun HomeScreen(
                 text = "Previous Sessions",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = OnSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -233,54 +233,12 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Recommended Subjects Button
-            Button(
-                onClick = onNavigateToTopSubjects,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryOrange,
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = "Recommended Subjects",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Logout Button
-            Button(
-                onClick = onLogout,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE0E0E0),
-                    contentColor = Color.Black
-                )
-            ) {
-                Text(
-                    text = "Logout",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             // Subject Occupancy Analytics Section
             Text(
                 text = "Subject Occupancy Analytics",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = OnSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -288,7 +246,7 @@ fun HomeScreen(
             Text(
                 text = "Sessions per hour and occupancy rate by subject",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.Gray,
+                color = MediumGray,
                 fontSize = 12.sp
             )
 
@@ -324,6 +282,48 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            // Recommended Subjects Button
+            Button(
+                onClick = onNavigateToTopSubjects,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryOrange,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Recommended Subjects",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Logout Button
+            Button(
+                onClick = onLogout,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SurfaceVariant,
+                    contentColor = TextColorBlack
+                )
+            ) {
+                Text(
+                    text = "Logout",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -343,7 +343,7 @@ private fun OccupancyCard(occupancy: TutorOccupancyData) {
             .shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = WhiteBase
         )
     ) {
         Column(
@@ -351,98 +351,64 @@ private fun OccupancyCard(occupancy: TutorOccupancyData) {
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Subject name and indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = occupancy.subject,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = occupancy.subject,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Occupancy: ${String.format("%.2f", occupancy.occupancyRate)}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray
+                    )
+                }
                 Text(
                     text = occupancyIndicator,
-                    fontSize = 24.sp
+                    fontSize = 28.sp
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Metrics row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Sessions per hour
-                Column {
-                    Text(
-                        text = "Sessions/Hour",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "%.2f".format(occupancy.sessionsPerHour),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
-                }
-
-                // Occupancy rate
-                Column {
-                    Text(
-                        text = "Occupancy Rate",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "%.1f%%".format(occupancy.occupancyRate),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PrimaryOrange
-                    )
-                }
-
-                // Total sessions
-                Column {
-                    Text(
-                        text = "Total Sessions",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = occupancy.totalSessions.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
-                }
-            }
-
             // Occupancy progress bar
-            Spacer(modifier = Modifier.height(12.dp))
             LinearProgressIndicator(
                 progress = { (occupancy.occupancyRate / 100.0).toFloat() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp),
                 color = when {
-                    occupancy.occupancyRate >= 75 -> Color(0xFFE53935)  // Red
-                    occupancy.occupancyRate >= 50 -> Color(0xFFFDD835)  // Yellow
-                    else -> Color(0xFF43A047)                             // Green
+                    occupancy.occupancyRate >= 75 -> StatusHighRed  // Red
+                    occupancy.occupancyRate >= 50 -> StatusMediumYellow  // Yellow
+                    else -> StatusLowGreen                             // Green
                 },
-                trackColor = Color(0xFFE0E0E0),
+                trackColor = LightGray,
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Sessions/Hour: ${occupancy.sessionsPerHour}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MediumGray
+                )
+                Text(
+                    text = "Total: ${occupancy.totalSessions}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MediumGray
+                )
+            }
         }
     }
 }
@@ -477,7 +443,7 @@ private fun SessionCard(session: Session) {
             .shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = WhiteBase
         )
     ) {
         Row(
@@ -492,7 +458,7 @@ private fun SessionCard(session: Session) {
                     text = formattedDateTime,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = OnSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
