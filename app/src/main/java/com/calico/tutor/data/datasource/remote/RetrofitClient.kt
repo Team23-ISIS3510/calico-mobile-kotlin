@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://192.168.101.8:3000/"
+    private const val BASE_URL = "http://192.168.0.107:3000/"
 
     fun createRetrofit(
         httpClient: OkHttpClient = createHttpClient(null)
@@ -25,6 +25,10 @@ object RetrofitClient {
 
     fun createSubjectsApiService(retrofit: Retrofit): SubjectsApiService {
         return retrofit.create(SubjectsApiService::class.java)
+    }
+
+    fun createTelemetryApiService(retrofit: Retrofit): TelemetryApiService {
+        return retrofit.create(TelemetryApiService::class.java)
     }
 
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {

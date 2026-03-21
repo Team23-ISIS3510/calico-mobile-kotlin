@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.BugReportData
 import com.calico.tutor.domain.model.ShakeDetectorState
 import com.calico.tutor.util.EmailIntentHelper
@@ -23,6 +24,8 @@ class ShakeDetectorViewModel(
 
     private var currentScreen: String = "Unknown"
     private var userEmail: String? = null
+
+    private val telemetryRepository = ServiceLocator.telemetryRepository(context)
 
     private val shakeDetector = ShakeDetector(context) { force ->
         onShakeDetected(force)
@@ -48,6 +51,9 @@ class ShakeDetectorViewModel(
 
     private fun onShakeDetected(force: Float) {
         viewModelScope.launch {
+            // Send telemetry to backend
+            telemetryRepository.reportBug("User Shake Report")
+            
             val bugReportData = generateBugReportData()
             _state.value = ShakeDetectorState.ShakeDetected(bugReportData)
         }
