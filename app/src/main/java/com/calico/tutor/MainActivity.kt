@@ -29,5 +29,5 @@ fun CalicoAppRoot() {
     val context = LocalContext.current.applicationContext
     val factory = AuthViewModelFactory(context)
     val authViewModel: AuthViewModel = viewModel(factory = factory)
-    AuthScreen(viewModel = authViewModel)
+    AuthScreen(viewModel = authViewModel, context = context)
 }

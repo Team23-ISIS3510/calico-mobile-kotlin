@@ -41,7 +41,9 @@ import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
+import com.calico.tutor.ui.theme.TextColorBlack
 
 @Composable
 fun LoginScreen(
@@ -59,7 +61,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(MainBackground)
     ) {
         Column(
             modifier = Modifier
@@ -101,8 +103,8 @@ fun LoginScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black
+                    focusedTextColor = TextColorBlack,
+                    unfocusedTextColor = TextColorBlack
                 ),
                 singleLine = true
             )
@@ -128,8 +130,8 @@ fun LoginScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black
+                    focusedTextColor = TextColorBlack,
+                    unfocusedTextColor = TextColorBlack
                 ),
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true
@@ -155,7 +157,7 @@ fun LoginScreen(
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryOrange,
-                    contentColor = Color.Black
+                    contentColor = TextColorBlack
                 ),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
@@ -163,7 +165,7 @@ fun LoginScreen(
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color.Black,
+                        color = TextColorBlack,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -185,7 +187,7 @@ fun LoginScreen(
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = BeigeButton,
-                    contentColor = Color.Black
+                    contentColor = TextColorBlack
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {

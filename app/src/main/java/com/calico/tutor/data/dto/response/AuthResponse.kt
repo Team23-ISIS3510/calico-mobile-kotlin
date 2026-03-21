@@ -4,9 +4,9 @@ import com.google.gson.annotations.SerializedName
 
 data class AuthResponse(
     @SerializedName("idToken")
-    val idToken: String,
+    val idToken: String? = null,
     @SerializedName("refreshToken")
-    val refreshToken: String,
+    val refreshToken: String? = null,
     @SerializedName("expiresIn")
-    val expiresIn: Long
+    val expiresIn: Long = 3600
 )

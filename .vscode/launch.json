@@ -1,0 +1,58 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Android: Build & Run Debug",
+            "type": "shell",
+            "request": "launch",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "$env:JAVA_HOME='C:\\Program Files\\Java\\jdk-22' ; .\\gradlew.bat installDebug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "name": "Android: View Logcat",
+            "type": "shell",
+            "request": "launch",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "& 'C:\\Users\\asus\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe' logcat -s 'calico:*' -v threadtime"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "name": "Android: Start Emulator",
+            "type": "shell",
+            "request": "launch",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "& 'C:\\Users\\asus\\AppData\\Local\\Android\\Sdk\\emulator\\emulator.exe' -avd Medium_Phone_API_36.1 -no-window -no-audio"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "isBackground": true
+        }
+    ]
+}
