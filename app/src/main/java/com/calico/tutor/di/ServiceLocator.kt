@@ -4,9 +4,11 @@ import android.content.Context
 import com.calico.tutor.data.datasource.local.TokenManager
 import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
+import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
+import com.calico.tutor.data.repository.TelemetryRepository
 import com.calico.tutor.domain.repository.AuthRepository
 import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
@@ -21,9 +23,13 @@ object ServiceLocator {
     @Volatile
     private var subjectsApiService: SubjectsApiService? = null
     @Volatile
+    private var telemetryApiService: TelemetryApiService? = null
+    @Volatile
     private var authRepository: AuthRepository? = null
     @Volatile
     private var analyticsRepository: AnalyticsRepository? = null
+    @Volatile
+    private var telemetryRepository: TelemetryRepository? = null
 
     private fun getTokenManager(context: Context): TokenManager {
         return _tokenManager ?: synchronized(this) {
@@ -65,6 +71,22 @@ object ServiceLocator {
             analyticsRepository ?: AnalyticsRepositoryImpl(
                 subjectsApiService = subjectsApiService(context)
             ).also { analyticsRepository = it }
+        }
+    }
+
+    private fun telemetryApiService(context: Context): TelemetryApiService {
+        return telemetryApiService ?: synchronized(this) {
+            telemetryApiService ?: RetrofitClient.createTelemetryApiService(
+                RetrofitClient.createRetrofit()
+            ).also { telemetryApiService = it }
+        }
+    }
+
+    fun telemetryRepository(context: Context): TelemetryRepository {
+        return telemetryRepository ?: synchronized(this) {
+            telemetryRepository ?: TelemetryRepository(
+                apiService = telemetryApiService(context)
+            ).also { telemetryRepository = it }
         }
     }
 
