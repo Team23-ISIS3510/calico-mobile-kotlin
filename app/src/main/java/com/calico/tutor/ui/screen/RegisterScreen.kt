@@ -1,5 +1,6 @@
 package com.calico.tutor.ui.screen
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +25,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,12 +34,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.calico.tutor.ui.component.AuthTextField
-import com.calico.tutor.ui.theme.PrimaryYellow
+import com.calico.tutor.R
+import com.calico.tutor.ui.theme.BeigeButton
+import com.calico.tutor.ui.theme.BrownText
+import com.calico.tutor.ui.theme.CreamBackground
+import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.MainBackground
+import com.calico.tutor.ui.theme.PrimaryOrange
+import com.calico.tutor.ui.theme.TextColorBlack
 
 @Composable
 fun RegisterScreen(
@@ -56,15 +69,16 @@ fun RegisterScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MainBackground)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Back button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -72,93 +86,134 @@ fun RegisterScreen(
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
+                        contentDescription = "Back",
+                        tint = TextColorBlack
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .background(
-                        color = PrimaryYellow,
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "CT",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                "Create Account",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                "Join Calico and start learning",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            // Calico Logo
+            Image(
+                painter = painterResource(id = R.drawable.calico_logo),
+                contentDescription = "Calico Logo",
+                modifier = Modifier.size(120.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            AuthTextField(
+            // Email Input
+            OutlinedTextField(
                 value = email,
                 onValueChange = { setEmail(it) },
-                label = "Email",
-                isEmail = true,
+                placeholder = {
+                    Text(
+                        "Email",
+                        color = BrownText,
+                        fontSize = 14.sp
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
-                isError = email.isNotEmpty() && !email.contains("@")
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CreamInput,
+                    unfocusedContainerColor = CreamInput,
+                    disabledContainerColor = CreamInput,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = TextColorBlack,
+                    unfocusedTextColor = TextColorBlack
+                ),
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            AuthTextField(
+            // Password Input
+            OutlinedTextField(
                 value = password,
                 onValueChange = { setPassword(it) },
-                label = "Password",
-                isPassword = true,
+                placeholder = {
+                    Text(
+                        "Password",
+                        color = BrownText,
+                        fontSize = 14.sp
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
-                isError = password.isNotEmpty() && password.length < 6,
-                supportingText = if (password.isNotEmpty() && password.length < 6) "Min 6 characters" else null
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CreamInput,
+                    unfocusedContainerColor = CreamInput,
+                    disabledContainerColor = CreamInput,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                ),
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            AuthTextField(
+            // Name Input
+            OutlinedTextField(
                 value = name,
                 onValueChange = { setName(it) },
-                label = "Full Name",
-                modifier = Modifier.fillMaxWidth()
+                placeholder = {
+                    Text(
+                        "Full Name",
+                        color = BrownText,
+                        fontSize = 14.sp
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CreamInput,
+                    unfocusedContainerColor = CreamInput,
+                    disabledContainerColor = CreamInput,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                ),
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            AuthTextField(
+            // Phone Input
+            OutlinedTextField(
                 value = phone,
                 onValueChange = { setPhone(it) },
-                label = "Phone Number",
-                keyboardType = KeyboardType.Phone,
+                placeholder = {
+                    Text(
+                        "Phone Number",
+                        color = BrownText,
+                        fontSize = 14.sp
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
-                isError = phone.isNotEmpty() && phone.length < 10
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CreamInput,
+                    unfocusedContainerColor = CreamInput,
+                    disabledContainerColor = CreamInput,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                ),
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Tutor Checkbox
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -170,87 +225,102 @@ fun RegisterScreen(
                 Text(
                     "I'm a tutor",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = Color.Black
                 )
             }
 
-            if (errorMessage != null) {
+            val (validationError, setValidationError) = remember { mutableStateOf<String?>(null) }
+            val combinedErrorMessage = validationError ?: errorMessage
+
+            if (combinedErrorMessage != null) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .padding(12.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            errorMessage,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        if (isRetryable && onRetry != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            TextButton(
-                                onClick = onRetry,
-                                modifier = Modifier.align(Alignment.End)
-                            ) {
-                                Text("Retry", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
+                Text(
+                    combinedErrorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
+            // Register Button
             Button(
-                onClick = { onRegisterClick(email, password, name, phone, isTutor) },
+                onClick = {
+                    // Basic client-side validation before attempting registration
+                    val trimmedEmail = email.trim()
+                    val trimmedName = name.trim()
+                    val trimmedPhone = phone.trim()
+
+                    val localError = when {
+                        trimmedEmail.isEmpty() ||
+                            !trimmedEmail.contains("@") ||
+                            !trimmedEmail.contains(".") ->
+                            "Please enter a valid email address."
+                        password.length < 6 ->
+                            "Password must be at least 6 characters long."
+                        trimmedName.length < 2 ->
+                            "Please enter your full name."
+                        trimmedPhone.length < 10 ->
+                            "Please enter a valid phone number."
+                        else -> null
+                    }
+
+                    if (localError != null) {
+                        setValidationError(localError)
+                    } else {
+                        setValidationError(null)
+                        onRegisterClick(trimmedEmail, password, trimmedName, trimmedPhone, isTutor)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryYellow,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = PrimaryOrange,
+                    contentColor = Color.Black
                 ),
+                shape = RoundedCornerShape(12.dp),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && 
                          name.isNotEmpty() && phone.isNotEmpty()
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
+                        color = Color.Black,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Already have an account? ",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                TextButton(onClick = onBackClick) {
                     Text(
-                        "Sign In",
-                        color = PrimaryYellow,
-                        fontWeight = FontWeight.SemiBold
+                        "Register",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Back to Login Button
+            Button(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BeigeButton,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "Back to Login",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

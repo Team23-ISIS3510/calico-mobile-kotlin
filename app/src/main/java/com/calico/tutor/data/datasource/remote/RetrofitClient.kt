@@ -4,9 +4,10 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://192.168.0.108:3000/api/"
+    private const val BASE_URL = "http://192.168.0.107:3000/"
 
     fun createRetrofit(
         httpClient: OkHttpClient = createHttpClient(null)
@@ -22,6 +23,14 @@ object RetrofitClient {
         return retrofit.create(AuthApiService::class.java)
     }
 
+    fun createSubjectsApiService(retrofit: Retrofit): SubjectsApiService {
+        return retrofit.create(SubjectsApiService::class.java)
+    }
+
+    fun createTelemetryApiService(retrofit: Retrofit): TelemetryApiService {
+        return retrofit.create(TelemetryApiService::class.java)
+    }
+
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {
         return createHttpClient(tokenManager)
     }
@@ -33,6 +42,9 @@ object RetrofitClient {
 
         val builder = OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
 
         if (tokenManager != null) {
             builder.addInterceptor(TokenInterceptor(tokenManager))

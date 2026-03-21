@@ -6,8 +6,8 @@ import com.calico.tutor.domain.model.AuthToken
 object AuthMapper {
     fun toAuthToken(response: AuthResponse): AuthToken {
         return AuthToken(
-            idToken = response.idToken,
-            refreshToken = response.refreshToken,
+            idToken = response.idToken ?: "user",
+            refreshToken = response.refreshToken ?: "",
             expiresIn = response.expiresIn
         )
     }
