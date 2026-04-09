@@ -49,6 +49,7 @@ import com.calico.tutor.ui.theme.CreamInput
 import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
 import com.calico.tutor.ui.theme.TextColorBlack
+import com.calico.tutor.util.EmailValidator
 
 @Composable
 fun RegisterScreen(
@@ -65,6 +66,18 @@ fun RegisterScreen(
     val (phone, setPhone) = remember { mutableStateOf("") }
     val (isTutor, setIsTutor) = remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    
+    // Validation state
+    val emailError = remember(email) {
+        if (email.isNotBlank() && !EmailValidator.isValidEmail(email)) {
+            "Invalid email format"
+        } else {
+            null
+        }
+    }
+    
+    val validationError = emailError
+    val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
 
     Box(
         modifier = Modifier
@@ -126,8 +139,20 @@ fun RegisterScreen(
                     focusedTextColor = TextColorBlack,
                     unfocusedTextColor = TextColorBlack
                 ),
-                singleLine = true
+                singleLine = true,
+                isError = validationError != null
             )
+            
+            // Email validation error in red
+            if (validationError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    validationError,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -229,13 +254,12 @@ fun RegisterScreen(
                 )
             }
 
-            val (validationError, setValidationError) = remember { mutableStateOf<String?>(null) }
-            val combinedErrorMessage = validationError ?: errorMessage
-
-            if (combinedErrorMessage != null) {
+            // Authentication error from backend
+            val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
+            if (authenticationError != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    combinedErrorMessage,
+                    authenticationError,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
@@ -247,31 +271,7 @@ fun RegisterScreen(
             // Register Button
             Button(
                 onClick = {
-                    // Basic client-side validation before attempting registration
-                    val trimmedEmail = email.trim()
-                    val trimmedName = name.trim()
-                    val trimmedPhone = phone.trim()
-
-                    val localError = when {
-                        trimmedEmail.isEmpty() ||
-                            !trimmedEmail.contains("@") ||
-                            !trimmedEmail.contains(".") ->
-                            "Please enter a valid email address."
-                        password.length < 6 ->
-                            "Password must be at least 6 characters long."
-                        trimmedName.length < 2 ->
-                            "Please enter your full name."
-                        trimmedPhone.length < 10 ->
-                            "Please enter a valid phone number."
-                        else -> null
-                    }
-
-                    if (localError != null) {
-                        setValidationError(localError)
-                    } else {
-                        setValidationError(null)
-                        onRegisterClick(trimmedEmail, password, trimmedName, trimmedPhone, isTutor)
-                    }
+                    onRegisterClick(email.trim(), password, name.trim(), phone.trim(), isTutor)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -282,7 +282,7 @@ fun RegisterScreen(
                 ),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && 
-                         name.isNotEmpty() && phone.isNotEmpty()
+                         name.isNotEmpty() && phone.isNotEmpty() && validationError == null
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

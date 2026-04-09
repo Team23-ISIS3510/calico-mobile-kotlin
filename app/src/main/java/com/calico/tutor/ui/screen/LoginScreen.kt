@@ -59,7 +59,7 @@ fun LoginScreen(
     val (password, setPassword) = remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
     
-    // Validation state - show error only if email is non-empty but invalid
+    // Email validation
     val emailError = remember(email) {
         if (email.isNotBlank() && !EmailValidator.isValidEmail(email)) {
             "Invalid email format"
@@ -68,9 +68,19 @@ fun LoginScreen(
         }
     }
     
-    // Determine error type: validation vs authentication
-    val validationError = emailError
-    val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
+    // Password validation - must be at least 6 characters
+    val passwordError = remember(password) {
+        if (password.isNotBlank() && password.length < 6) {
+            "Password must be at least 6 characters"
+        } else {
+            null
+        }
+    }
+    
+    // Error display logic
+    val showEmailError = emailError != null
+    val showPasswordError = passwordError != null
+    val showAuthenticationError = emailError == null && passwordError == null && errorMessage != null
 
     Box(
         modifier = Modifier
@@ -101,7 +111,7 @@ fun LoginScreen(
             // Email/Username Input
             OutlinedTextField(
                 value = email,
-                onValueChange = { setEmail(it) },
+                onValueChange = { if (it.length <= 254) setEmail(it) },
                 placeholder = {
                     Text(
                         "Username or Email",
@@ -121,14 +131,14 @@ fun LoginScreen(
                     unfocusedTextColor = TextColorBlack
                 ),
                 singleLine = true,
-                isError = validationError != null
+                isError = showEmailError
             )
             
             // Email validation error in red
-            if (validationError != null) {
+            if (showEmailError) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    validationError,
+                    emailError!!,
                     color = Color.Red,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
@@ -140,7 +150,7 @@ fun LoginScreen(
             // Password Input
             OutlinedTextField(
                 value = password,
-                onValueChange = { setPassword(it) },
+                onValueChange = { if (it.length <= 128) setPassword(it) },
                 placeholder = {
                     Text(
                         "Password",
@@ -160,15 +170,27 @@ fun LoginScreen(
                     unfocusedTextColor = TextColorBlack
                 ),
                 visualTransformation = PasswordVisualTransformation(),
-                singleLine = true
+                singleLine = true,
+                isError = showPasswordError
             )
+            
+            // Password validation error in red
+            if (showPasswordError) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    passwordError!!,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-            // Authentication error message
-            if (authenticationError != null) {
+            // Authentication error message (only show if fields are valid)
+            if (showAuthenticationError) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    authenticationError,
-                    color = MaterialTheme.colorScheme.error,
+                    errorMessage!!,
+                    color = Color.Red,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -187,7 +209,7 @@ fun LoginScreen(
                     contentColor = TextColorBlack
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && validationError == null
+                enabled = !isLoading && email.isNotEmpty() && password.length >= 6 && !showEmailError && !showPasswordError
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -239,3 +261,4 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
+}

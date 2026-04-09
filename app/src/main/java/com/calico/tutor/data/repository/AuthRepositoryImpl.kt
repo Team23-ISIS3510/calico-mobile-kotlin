@@ -5,6 +5,7 @@ import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.dto.request.LoginRequest
 import com.calico.tutor.data.dto.request.RegisterRequest
 import com.calico.tutor.data.mapper.AuthMapper
+import com.calico.tutor.data.utils.ErrorMessageMapper
 import com.calico.tutor.domain.model.AuthToken
 import com.calico.tutor.domain.repository.AuthRepository
 import com.calico.tutor.domain.utils.Result
@@ -23,7 +24,8 @@ class AuthRepositoryImpl(
             tokenManager.saveEmail(email)
             Result.Success(authToken)
         } catch (e: Exception) {
-            Result.Error(e, e.localizedMessage ?: "Login failed")
+            val errorMessage = ErrorMessageMapper.getErrorMessage(e)
+            Result.Error(e, errorMessage)
         }
     }
 
@@ -50,7 +52,8 @@ class AuthRepositoryImpl(
             tokenManager.saveEmail(email)
             Result.Success(authToken)
         } catch (e: Exception) {
-            Result.Error(e, e.localizedMessage ?: "Registration failed")
+            val errorMessage = ErrorMessageMapper.getErrorMessage(e)
+            Result.Error(e, errorMessage)
         }
     }
 
@@ -66,7 +69,7 @@ class AuthRepositoryImpl(
                 Result.Success(null)
             }
         } catch (e: Exception) {
-            Result.Error(e, "Failed to retrieve stored token")
+            Result.Error(e, ErrorMessageMapper.getErrorMessage(e))
         }
     }
 
@@ -75,7 +78,7 @@ class AuthRepositoryImpl(
             tokenManager.clearToken()
             Result.Success(Unit)
         } catch (e: Exception) {
-            Result.Error(e, "Failed to clear token")
+            Result.Error(e, ErrorMessageMapper.getErrorMessage(e))
         }
     }
 
