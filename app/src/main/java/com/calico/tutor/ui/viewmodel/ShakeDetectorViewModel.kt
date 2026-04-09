@@ -52,7 +52,11 @@ class ShakeDetectorViewModel(
     private fun onShakeDetected(force: Float) {
         viewModelScope.launch {
             // Send telemetry to backend
-            telemetryRepository.reportBug("User Shake Report")
+            telemetryRepository.reportBug(
+                message = "User Shake Report",
+                feature = "shake_report",
+                action = "device_shake_detected"
+            )
             
             val bugReportData = generateBugReportData()
             _state.value = ShakeDetectorState.ShakeDetected(bugReportData)

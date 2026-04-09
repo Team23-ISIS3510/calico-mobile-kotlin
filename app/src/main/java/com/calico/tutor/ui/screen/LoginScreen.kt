@@ -44,6 +44,7 @@ import com.calico.tutor.ui.theme.CreamInput
 import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
 import com.calico.tutor.ui.theme.TextColorBlack
+import com.calico.tutor.util.EmailValidator
 
 @Composable
 fun LoginScreen(
@@ -57,6 +58,19 @@ fun LoginScreen(
     val (email, setEmail) = remember { mutableStateOf("") }
     val (password, setPassword) = remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
+    
+    // Validation state - show error only if email is non-empty but invalid
+    val emailError = remember(email) {
+        if (email.isNotBlank() && !EmailValidator.isValidEmail(email)) {
+            "Invalid email format"
+        } else {
+            null
+        }
+    }
+    
+    // Determine error type: validation vs authentication
+    val validationError = emailError
+    val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
 
     Box(
         modifier = Modifier
@@ -106,8 +120,20 @@ fun LoginScreen(
                     focusedTextColor = TextColorBlack,
                     unfocusedTextColor = TextColorBlack
                 ),
-                singleLine = true
+                singleLine = true,
+                isError = validationError != null
             )
+            
+            // Email validation error in red
+            if (validationError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    validationError,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -137,10 +163,11 @@ fun LoginScreen(
                 singleLine = true
             )
 
-            if (errorMessage != null) {
+            // Authentication error message
+            if (authenticationError != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    errorMessage,
+                    authenticationError,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
@@ -160,7 +187,7 @@ fun LoginScreen(
                     contentColor = TextColorBlack
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
+                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && validationError == null
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -212,4 +239,3 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
-}
