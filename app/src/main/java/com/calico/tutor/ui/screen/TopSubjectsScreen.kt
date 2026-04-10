@@ -35,9 +35,7 @@ fun TopSubjectsScreen(
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
             
-            // Process data from the endpoint
             if (response.data != null) {
-                // Group by courseId and count frequency
                 val courseMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
@@ -52,7 +50,6 @@ fun TopSubjectsScreen(
                     }
                 }
                 
-                // Convert to Subject and sort by frequency (top 3)
                 topSubjects = courseMap.entries.map { (courseId, nameAndCount) ->
                     val subject = Subject(
                         id = courseId,
@@ -80,7 +77,6 @@ fun TopSubjectsScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with back arrow
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -111,7 +107,6 @@ fun TopSubjectsScreen(
             }
 
             // Content
-            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
@@ -177,7 +172,6 @@ fun TopSubjectsScreen(
 
                     // Apply Button
                     Button(
-                        onClick = {},
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -225,7 +219,6 @@ private fun TopSubjectCard(
         ) {
             // Ranking number
             Box(
-                modifier = Modifier
                     .size(40.dp)
                     .background(
                         color = PrimaryOrange,
@@ -244,7 +237,6 @@ private fun TopSubjectCard(
             // Subject information
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subject,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black

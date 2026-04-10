@@ -37,9 +37,7 @@ fun RecommendedSubjectsScreen(
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
             
-            // Process data from the endpoint
             if (response.data != null) {
-                // Group by courseId and course to get unique subjects
                 val courseMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
@@ -54,7 +52,6 @@ fun RecommendedSubjectsScreen(
                     }
                 }
                 
-                // Convert to Subject and sort by frequency (top 3)
                 subjects = courseMap.entries.map { (courseId, nameAndCount) ->
                     Subject(
                         id = courseId,
@@ -117,7 +114,6 @@ fun RecommendedSubjectsScreen(
                 }
             }
 
-            // Content
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -199,7 +195,7 @@ fun RecommendedSubjectsScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Apply Button
-                    Button(
+
                         onClick = {
                             val selectedItems = subjects.filter { it.id in selectedSubjects }
                             onApply(selectedItems)

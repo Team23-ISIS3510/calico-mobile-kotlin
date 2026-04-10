@@ -56,7 +56,6 @@ fun HomeScreen(
             try {
                 val subjectsApiService = ServiceLocator.subjectsApiService(context)
                 
-                // Load tutor profile to get the actual name
                 try {
                     val tutorResponse = subjectsApiService.getTutorProfile(tutorId)
                     tutorName = tutorResponse.name
@@ -64,9 +63,7 @@ fun HomeScreen(
                     tutorName = userName
                 }
                 
-                // Load previous sessions from backend
                 try {
-                    Log.d("HomeScreen", "Loading previous sessions...")
                     val previousResponse = subjectsApiService.getPreviousSessions(tutorId)
                     previousSessions = previousResponse.sessions.map { sessionData ->
                         Session(
@@ -83,17 +80,13 @@ fun HomeScreen(
                             subjectCode = ""
                         )
                     }
-                    Log.d("HomeScreen", "Previous sessions loaded: ${previousSessions.size}")
                     isLoading = false
                 } catch (e: Exception) {
                     error = "Error loading sessions"
-                    Log.e("HomeScreen", "Error: ${e.message}")
                     isLoading = false
                 }
                 
-                // Load upcoming sessions from backend
                 try {
-                    Log.d("HomeScreen", "Loading upcoming sessions...")
                     val upcomingResponse = subjectsApiService.getUpcomingSessions(tutorId)
                     upcomingSessions = upcomingResponse.sessions.map { sessionData ->
                         Session(
@@ -110,26 +103,20 @@ fun HomeScreen(
                             subjectCode = ""
                         )
                     }
-                    Log.d("HomeScreen", "Upcoming sessions loaded: ${upcomingSessions.size}")
                 } catch (e: Exception) {
                     error = "Error loading sessions"
-                    Log.e("HomeScreen", "Error: ${e.message}")
                 }
             } catch (e: Exception) {
                 error = "Connection error: ${e.message}"
                 isLoading = false
             }
 
-            // Load occupancy analytics
             try {
-                Log.d("HomeScreen", "Loading occupancy data...")
                 val subjectsApiService = ServiceLocator.subjectsApiService(context)
                 val occupancyResponse = subjectsApiService.getTutorOccupancy(tutorId)
                 occupancyData = occupancyResponse.data
-                Log.d("HomeScreen", "Occupancy loaded: ${occupancyData.size} subjects")
                 isLoadingOccupancy = false
             } catch (e: Exception) {
-                Log.e("HomeScreen", "Error loading occupancy: ${e.message}")
                 isLoadingOccupancy = false
             }
         } else {
@@ -480,7 +467,6 @@ private fun SessionCard(session: Session, context: Context? = null) {
     var courseName by remember { mutableStateOf<String?>(null) }
     var isLoadingCourseName by remember { mutableStateOf(true) }
 
-    // Load course name from API
     LaunchedEffect(session.courseId) {
         if (context != null && !session.courseId.isNullOrEmpty()) {
             try {
@@ -498,7 +484,6 @@ private fun SessionCard(session: Session, context: Context? = null) {
         }
     }
 
-    // Format the date and time from scheduledStart
     val dateTimeFormatter = try {
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
     } catch (e: Exception) {
