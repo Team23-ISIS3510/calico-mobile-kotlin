@@ -25,6 +25,7 @@ import com.calico.tutor.ui.theme.*
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.calico.tutor.data.dto.response.TutorOccupancyData
+import com.calico.tutor.data.dto.response.DemandMetrics
 import com.calico.tutor.ui.viewmodel.HomeScreenViewModel
 import com.calico.tutor.ui.viewmodel.HomeScreenViewModelFactory
 import com.calico.tutor.ui.viewmodel.SessionsState
@@ -284,11 +285,10 @@ fun HomeScreen(
 
 @Composable
 private fun OccupancyCard(occupancy: TutorOccupancyData) {
-    // Determine occupancy level indicator emoji
     val occupancyIndicator = when {
-        occupancy.occupancyRate >= 75 -> "🔴"  // Overloaded (red)
-        occupancy.occupancyRate >= 50 -> "🟡"  // Medium (yellow)
-        else -> "🟢"                            // Available (green)
+        occupancy.occupancyRate >= 75 -> "🔴"
+        occupancy.occupancyRate >= 50 -> "🟡"
+        else -> "🟢"
     }
 
     Card(
@@ -296,9 +296,7 @@ private fun OccupancyCard(occupancy: TutorOccupancyData) {
             .fillMaxWidth()
             .shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WhiteBase
-        )
+        colors = CardDefaults.cardColors(containerColor = WhiteBase)
     ) {
         Column(
             modifier = Modifier
@@ -319,29 +317,25 @@ private fun OccupancyCard(occupancy: TutorOccupancyData) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Occupancy: ${String.format("%.2f", occupancy.occupancyRate)}%",
+                        text = "Occupancy General: ${String.format("%.2f", occupancy.occupancyRate)}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = MediumGray
                     )
                 }
-                Text(
-                    text = occupancyIndicator,
-                    fontSize = 28.sp
-                )
+                Text(text = occupancyIndicator, fontSize = 28.sp)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Occupancy progress bar
             LinearProgressIndicator(
                 progress = { (occupancy.occupancyRate / 100.0).toFloat() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp),
                 color = when {
-                    occupancy.occupancyRate >= 75 -> StatusHighRed  // Red
-                    occupancy.occupancyRate >= 50 -> StatusMediumYellow  // Yellow
-                    else -> StatusLowGreen                             // Green
+                    occupancy.occupancyRate >= 75 -> StatusHighRed
+                    occupancy.occupancyRate >= 50 -> StatusMediumYellow
+                    else -> StatusLowGreen
                 },
                 trackColor = LightGray,
             )
@@ -353,16 +347,138 @@ private fun OccupancyCard(occupancy: TutorOccupancyData) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Sessions/Hour: ${occupancy.sessionsPerHour}",
+                    text = "Sessions/Hour: ${String.format("%.2f", occupancy.sessionsPerHour)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MediumGray
                 )
                 Text(
-                    text = "Total: ${occupancy.totalSessions}",
+                    text = "Total Sesiones: ${occupancy.totalSessions}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MediumGray
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Divider(color = LightGray, thickness = 1.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (occupancy.highDemand != null) {
+                DemandMetricsRow(
+                    title = "🔴 ALTA DEMANDA",
+                    metrics = occupancy.highDemand,
+                    backgroundColor = Color(0xFFFFEBEE)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (occupancy.normalDemand != null) {
+                DemandMetricsRow(
+                    title = "🟢 DEMANDA NORMAL",
+                    metrics = occupancy.normalDemand,
+                    backgroundColor = Color(0xFFF1F8E9)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DemandMetricsRow(
+    title: String,
+    metrics: DemandMetrics,
+    backgroundColor: Color
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = backgroundColor,
+        shadowElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Ocupación",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "${String.format("%.2f", metrics.occupancyRate)}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sesiones/Hora",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = String.format("%.2f", metrics.sessionsPerHour),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Total Sesiones",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "${metrics.totalSessions ?: 0}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Horas Ocupadas",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "${String.format("%.1f", metrics.totalHoursOccupied ?: 0.0)}h",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { (metrics.occupancyRate / 100.0).toFloat() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                color = PrimaryOrange,
+                trackColor = Color.White,
+            )
         }
     }
 }
