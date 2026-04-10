@@ -35,9 +35,7 @@ fun TopSubjectsScreen(
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
             
-            // Process data from the endpoint
             if (response.data != null) {
-                // Group by courseId and count frequency
                 val courseMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
@@ -52,7 +50,6 @@ fun TopSubjectsScreen(
                     }
                 }
                 
-                // Convert to Subject and sort by frequency (top 3)
                 topSubjects = courseMap.entries.map { (courseId, nameAndCount) ->
                     val subject = Subject(
                         id = courseId,
@@ -80,7 +77,6 @@ fun TopSubjectsScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with back arrow
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -110,7 +106,6 @@ fun TopSubjectsScreen(
                 }
             }
 
-            // Content
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -177,7 +172,7 @@ fun TopSubjectsScreen(
 
                     // Apply Button
                     Button(
-                        onClick = {},
+                        onClick = { onNavigateBack() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -188,7 +183,7 @@ fun TopSubjectsScreen(
                         )
                     ) {
                         Text(
-                            text = "Apply Now",
+                            text = "Done",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )

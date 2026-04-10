@@ -24,10 +24,11 @@ class CalicoApp : Application() {
                 val stackTrace = stringWriter.toString()
 
                 // Send crash report to backend
-                telemetryRepository.reportCrash(stackTrace)
-
-                // Give it a moment to send (blocking call)
-                Thread.sleep(1000)
+                telemetryRepository.reportCrashBlocking(
+                    stackTrace = stackTrace,
+                    feature = "app",
+                    action = "uncaught_exception"
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
