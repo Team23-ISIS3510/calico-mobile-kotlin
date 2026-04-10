@@ -194,8 +194,7 @@ fun RecommendedSubjectsScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Apply Button
-
+                    Button(
                         onClick = {
                             val selectedItems = subjects.filter { it.id in selectedSubjects }
                             onApply(selectedItems)

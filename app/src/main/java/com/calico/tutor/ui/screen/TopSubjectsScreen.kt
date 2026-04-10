@@ -106,7 +106,7 @@ fun TopSubjectsScreen(
                 }
             }
 
-            // Content
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
@@ -172,6 +172,7 @@ fun TopSubjectsScreen(
 
                     // Apply Button
                     Button(
+                        onClick = { onNavigateBack() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -182,7 +183,7 @@ fun TopSubjectsScreen(
                         )
                     ) {
                         Text(
-                            text = "Apply Now",
+                            text = "Done",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -219,6 +220,7 @@ private fun TopSubjectCard(
         ) {
             // Ranking number
             Box(
+                modifier = Modifier
                     .size(40.dp)
                     .background(
                         color = PrimaryOrange,
@@ -237,6 +239,7 @@ private fun TopSubjectCard(
             // Subject information
             Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    text = subject,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black

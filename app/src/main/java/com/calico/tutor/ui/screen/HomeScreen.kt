@@ -19,11 +19,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calico.tutor.R
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.calico.tutor.data.dto.response.TutorOccupancyData
+import com.calico.tutor.ui.viewmodel.HomeScreenViewModel
+import com.calico.tutor.ui.viewmodel.HomeScreenViewModelFactory
+import com.calico.tutor.ui.viewmodel.SessionsState
+import com.calico.tutor.ui.viewmodel.OccupancyState
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import java.text.SimpleDateFormat
@@ -38,92 +43,43 @@ fun HomeScreen(
     onLogout: () -> Unit = {},
     onNavigateToTopSubjects: () -> Unit = {}
 ) {
-    var previousSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
-    var upcomingSessions by remember { mutableStateOf<List<Session>>(emptyList()) }
-    var occupancyData by remember { mutableStateOf<List<TutorOccupancyData>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var isLoadingOccupancy by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var occupancyError by remember { mutableStateOf<String?>(null) }
-    var tutorName by remember { mutableStateOf(userName) }
-    val isDebugBuild = ((context?.applicationInfo?.flags ?: 0) and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-    val telemetryRepository = remember(context) {
-        context?.let { ServiceLocator.telemetryRepository(it) }
-    }
+    // Obtener ViewModel
+    val viewModel: HomeScreenViewModel = viewModel(
+        factory = context?.let { HomeScreenViewModelFactory(it) }
+    )
 
+    // Observar estados del ViewModel
+    val sessionsStateValue = viewModel.sessionsState.collectAsState().value
+    val occupancyStateValue = viewModel.occupancyState.collectAsState().value
+    val tutorNameValue = viewModel.tutorName.collectAsState().value
+
+    // Cargar datos al inicializar
     LaunchedEffect(Unit) {
-        if (context != null) {
-            try {
-                val subjectsApiService = ServiceLocator.subjectsApiService(context)
-                
-                try {
-                    val tutorResponse = subjectsApiService.getTutorProfile(tutorId)
-                    tutorName = tutorResponse.name
-                } catch (e: Exception) {
-                    tutorName = userName
-                }
-                
-                try {
-                    val previousResponse = subjectsApiService.getPreviousSessions(tutorId)
-                    previousSessions = previousResponse.sessions.map { sessionData ->
-                        Session(
-                            id = sessionData.id,
-                            scheduledStart = sessionData.scheduledStart,
-                            scheduledEnd = sessionData.scheduledEnd,
-                            status = sessionData.status,
-                            course = sessionData.course,
-                            courseId = sessionData.courseId,
-                            date = "",
-                            time = "",
-                            tutorName = "",
-                            subjectName = "",
-                            subjectCode = ""
-                        )
-                    }
-                    isLoading = false
-                } catch (e: Exception) {
-                    error = "Error loading sessions"
-                    isLoading = false
-                }
-                
-                try {
-                    val upcomingResponse = subjectsApiService.getUpcomingSessions(tutorId)
-                    upcomingSessions = upcomingResponse.sessions.map { sessionData ->
-                        Session(
-                            id = sessionData.id,
-                            scheduledStart = sessionData.scheduledStart,
-                            scheduledEnd = sessionData.scheduledEnd,
-                            status = sessionData.status,
-                            course = sessionData.course,
-                            courseId = sessionData.courseId,
-                            date = "",
-                            time = "",
-                            tutorName = "",
-                            subjectName = "",
-                            subjectCode = ""
-                        )
-                    }
-                } catch (e: Exception) {
-                    error = "Error loading sessions"
-                }
-            } catch (e: Exception) {
-                error = "Connection error: ${e.message}"
-                isLoading = false
-            }
-
-            try {
-                val subjectsApiService = ServiceLocator.subjectsApiService(context)
-                val occupancyResponse = subjectsApiService.getTutorOccupancy(tutorId)
-                occupancyData = occupancyResponse.data
-                isLoadingOccupancy = false
-            } catch (e: Exception) {
-                isLoadingOccupancy = false
-            }
-        } else {
-            error = "Context is null"
-            isLoading = false
-        }
+        viewModel.loadSessions(tutorId)
+        viewModel.loadOccupancy(tutorId)
     }
+
+    // Extraer datos del estado de sesiones
+    val (previousSessions, upcomingSessions, sessionsError) = when (sessionsStateValue) {
+        is SessionsState.Success -> Triple(
+            sessionsStateValue.previousSessions,
+            sessionsStateValue.upcomingSessions,
+            null
+        )
+        is SessionsState.Error -> Triple(emptyList(), emptyList(), sessionsStateValue.message)
+        else -> Triple(emptyList(), emptyList(), null)
+    }
+
+    val isLoadingSessions = sessionsStateValue is SessionsState.Loading
+
+    // Extraer datos del estado de ocupancy
+    val (occupancyData, occupancyError) = when (occupancyStateValue) {
+        is OccupancyState.Success -> Pair(occupancyStateValue.data, null)
+        is OccupancyState.Error -> Pair(emptyList(), occupancyStateValue.message)
+        else -> Pair(emptyList(), null)
+    }
+
+    val isLoadingOccupancy = occupancyStateValue is OccupancyState.Loading
 
     Box(
         modifier = Modifier
@@ -155,7 +111,7 @@ fun HomeScreen(
 
             // Welcome Message
             Text(
-                text = "WELCOME TO CALICO,\n$tutorName",
+                text = "WELCOME TO CALICO,\n$tutorNameValue",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -176,7 +132,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isLoading) {
+            if (isLoadingSessions) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -185,9 +141,9 @@ fun HomeScreen(
                 ) {
                     CircularProgressIndicator(color = PrimaryOrange)
                 }
-            } else if (error != null && upcomingSessions.isEmpty() && previousSessions.isEmpty()) {
+            } else if (sessionsError != null && upcomingSessions.isEmpty() && previousSessions.isEmpty()) {
                 Text(
-                    text = error ?: "Error",
+                    text = sessionsError,
                     color = Color.Red,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -216,7 +172,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (previousSessions.isEmpty() && !isLoading) {
+            if (previousSessions.isEmpty() && !isLoadingSessions) {
                 Text(
                     text = "You have not had any tutoring sessions yet.",
                     color = MediumGray,
@@ -319,57 +275,6 @@ fun HomeScreen(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-            }
-
-            if (isDebugBuild) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        telemetryRepository?.reportLatency(
-                            endpoint = "debug/force-latency",
-                            latencyMs = 2500,
-                            feature = "debug_tools",
-                            action = "manual_latency_test",
-                            method = "DEBUG",
-                            statusCode = 200
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF8A2BE2),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = "Force Latency 2.5s (Debug)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Button(
-                    onClick = { throw RuntimeException("Telemetry test crash") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Red,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = "Force Crash (Debug)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
