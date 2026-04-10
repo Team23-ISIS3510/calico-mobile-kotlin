@@ -2,12 +2,20 @@ package com.calico.tutor.data.datasource.remote
 
 import com.calico.tutor.data.datasource.local.TokenManager
 import okhttp3.Authenticator
+import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
+import android.os.SystemClock
 
 class TokenAuthenticator(private val tokenManager: TokenManager) : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
+        // Don't retry auth/login endpoints - let them fail naturally
+        val path = response.request.url.encodedPath
+        if (path.contains("/auth") || path.contains("/login")) {
+            return null
+        }
+        
         if (response.code == 401) {
             synchronized(this) {
                 val newToken = tokenManager.getRefreshToken()
@@ -37,5 +45,24 @@ class TokenInterceptor(private val tokenManager: TokenManager) : okhttp3.Interce
         }
         
         return chain.proceed(request)
+    }
+}
+
+class LatencyTelemetryInterceptor(
+    private val onLatencyMeasured: (endpoint: String, method: String, durationMs: Long, statusCode: Int) -> Unit
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val path = request.url.encodedPath
+        val startMs = SystemClock.elapsedRealtime()
+        val response = chain.proceed(request)
+        val durationMs = SystemClock.elapsedRealtime() - startMs
+
+        // Avoid telemetry self-logging loops.
+        if (!path.startsWith("/analytics")) {
+            onLatencyMeasured(path, request.method, durationMs, response.code)
+        }
+
+        return response
     }
 }

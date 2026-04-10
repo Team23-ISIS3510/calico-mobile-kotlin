@@ -25,6 +25,7 @@ import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.calico.tutor.data.dto.response.TutorOccupancyData
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import java.text.SimpleDateFormat
 import java.util.*
 import android.util.Log
@@ -45,6 +46,10 @@ fun HomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var occupancyError by remember { mutableStateOf<String?>(null) }
     var tutorName by remember { mutableStateOf(userName) }
+    val isDebugBuild = ((context?.applicationInfo?.flags ?: 0) and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    val telemetryRepository = remember(context) {
+        context?.let { ServiceLocator.telemetryRepository(it) }
+    }
 
     LaunchedEffect(Unit) {
         if (context != null) {
@@ -327,6 +332,57 @@ fun HomeScreen(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            if (isDebugBuild) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        telemetryRepository?.reportLatency(
+                            endpoint = "debug/force-latency",
+                            latencyMs = 2500,
+                            feature = "debug_tools",
+                            action = "manual_latency_test",
+                            method = "DEBUG",
+                            statusCode = 200
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF8A2BE2),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Force Latency 2.5s (Debug)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = { throw RuntimeException("Telemetry test crash") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Force Crash (Debug)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
