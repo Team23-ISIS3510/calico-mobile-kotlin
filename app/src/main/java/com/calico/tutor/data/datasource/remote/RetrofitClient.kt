@@ -1,5 +1,6 @@
 package com.calico.tutor.data.datasource.remote
 
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -7,15 +8,19 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://192.168.1.14:3000/"
+    private const val BASE_URL = "http://192.168.20.12:3000/"
 
     fun createRetrofit(
-        httpClient: OkHttpClient = createHttpClient(null)
+        httpClient: OkHttpClient = createHttpClient(null, null)
     ): Retrofit {
+        val gson = GsonBuilder()
+            .serializeNulls()
+            .create()
+        
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(httpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
@@ -32,10 +37,20 @@ object RetrofitClient {
     }
 
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {
-        return createHttpClient(tokenManager)
+        return createHttpClient(tokenManager, null)
     }
 
-    private fun createHttpClient(tokenManager: com.calico.tutor.data.datasource.local.TokenManager?): OkHttpClient {
+    fun createHttpClientWithTokenManagerAndLatency(
+        tokenManager: com.calico.tutor.data.datasource.local.TokenManager,
+        onLatencyMeasured: (endpoint: String, method: String, durationMs: Long, statusCode: Int) -> Unit
+    ): OkHttpClient {
+        return createHttpClient(tokenManager, onLatencyMeasured)
+    }
+
+    private fun createHttpClient(
+        tokenManager: com.calico.tutor.data.datasource.local.TokenManager?,
+        onLatencyMeasured: ((endpoint: String, method: String, durationMs: Long, statusCode: Int) -> Unit)?
+    ): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -45,6 +60,10 @@ object RetrofitClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+
+        if (onLatencyMeasured != null) {
+            builder.addInterceptor(LatencyTelemetryInterceptor(onLatencyMeasured))
+        }
 
         if (tokenManager != null) {
             builder.addInterceptor(TokenInterceptor(tokenManager))

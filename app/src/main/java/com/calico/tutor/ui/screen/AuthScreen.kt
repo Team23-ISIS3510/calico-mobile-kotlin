@@ -68,7 +68,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
         else -> {
             // Mostrar Login o Register según el estado
             if (showLogin) {
-                val errorState = authState as? AuthState.Error
+                val errorState = authState.value as? AuthState.Error
                 LoginScreen(
                     onLoginClick = { email, password ->
                         viewModel.login(email, password)
@@ -80,7 +80,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                     onRetry = { viewModel.retryFailedOperation() }
                 )
             } else {
-                val errorState = authState as? AuthState.Error
+                val errorState = authState.value as? AuthState.Error
                 RegisterScreen(
                     onRegisterClick = { email, password, name, phone, isTutor ->
                         viewModel.register(email, password, name, phone, isTutor)

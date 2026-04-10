@@ -41,7 +41,18 @@ object ServiceLocator {
         return authApiService ?: synchronized(this) {
             authApiService ?: RetrofitClient.createAuthApiService(
                 RetrofitClient.createRetrofit(
-                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                    RetrofitClient.createHttpClientWithTokenManagerAndLatency(
+                        getTokenManager(context)
+                    ) { endpoint, method, durationMs, statusCode ->
+                        telemetryRepository(context).reportLatency(
+                            endpoint = endpoint,
+                            latencyMs = durationMs,
+                            feature = "auth",
+                            action = "api_call",
+                            method = method,
+                            statusCode = statusCode
+                        )
+                    }
                 )
             ).also { authApiService = it }
         }
@@ -60,7 +71,18 @@ object ServiceLocator {
         return subjectsApiService ?: synchronized(this) {
             subjectsApiService ?: RetrofitClient.createSubjectsApiService(
                 RetrofitClient.createRetrofit(
-                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                    RetrofitClient.createHttpClientWithTokenManagerAndLatency(
+                        getTokenManager(context)
+                    ) { endpoint, method, durationMs, statusCode ->
+                        telemetryRepository(context).reportLatency(
+                            endpoint = endpoint,
+                            latencyMs = durationMs,
+                            feature = "analytics",
+                            action = "api_call",
+                            method = method,
+                            statusCode = statusCode
+                        )
+                    }
                 )
             ).also { subjectsApiService = it }
         }
@@ -85,7 +107,8 @@ object ServiceLocator {
     fun telemetryRepository(context: Context): TelemetryRepository {
         return telemetryRepository ?: synchronized(this) {
             telemetryRepository ?: TelemetryRepository(
-                apiService = telemetryApiService(context)
+                apiService = telemetryApiService(context),
+                context = context.applicationContext
             ).also { telemetryRepository = it }
         }
     }

@@ -30,6 +30,7 @@ import com.calico.tutor.ui.viewmodel.HomeScreenViewModelFactory
 import com.calico.tutor.ui.viewmodel.SessionsState
 import com.calico.tutor.ui.viewmodel.OccupancyState
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import java.text.SimpleDateFormat
 import java.util.*
 import android.util.Log
@@ -371,7 +372,6 @@ private fun SessionCard(session: Session, context: Context? = null) {
     var courseName by remember { mutableStateOf<String?>(null) }
     var isLoadingCourseName by remember { mutableStateOf(true) }
 
-    // Load course name from API
     LaunchedEffect(session.courseId) {
         if (context != null && !session.courseId.isNullOrEmpty()) {
             try {
@@ -389,7 +389,6 @@ private fun SessionCard(session: Session, context: Context? = null) {
         }
     }
 
-    // Format the date and time from scheduledStart
     val dateTimeFormatter = try {
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
     } catch (e: Exception) {
