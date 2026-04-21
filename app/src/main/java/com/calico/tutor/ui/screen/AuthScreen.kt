@@ -56,6 +56,10 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                         viewModel.login(email, password)
                     },
                     onRegisterClick = { setShowLogin(false) },
+                    onGoogleLoginClick = {
+                        // TODO: Implement Google Sign-In launcher here
+                        // This will be triggered when user clicks "Sign in with Google" button
+                    },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
                     isRetryable = errorState?.retryable == true,
