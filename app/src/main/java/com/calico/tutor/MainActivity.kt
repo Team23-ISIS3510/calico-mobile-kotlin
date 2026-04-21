@@ -18,16 +18,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             CalicoTheme {
-                CalicoAppRoot()
+                CalicoAppRoot(activity = this@MainActivity)
             }
         }
     }
 }
 
 @Composable
-fun CalicoAppRoot() {
+fun CalicoAppRoot(activity: androidx.activity.ComponentActivity) {
     val context = LocalContext.current.applicationContext
     val factory = AuthViewModelFactory(context)
     val authViewModel: AuthViewModel = viewModel(factory = factory)
-    AuthScreen(viewModel = authViewModel, context = context)
+    AuthScreen(viewModel = authViewModel, context = context, activity = activity)
 }

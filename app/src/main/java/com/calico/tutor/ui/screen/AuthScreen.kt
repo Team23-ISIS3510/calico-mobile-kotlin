@@ -16,19 +16,16 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 
 @Composable
-fun AuthScreen(viewModel: AuthViewModel, context: Context) {
+fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.activity.ComponentActivity) {
     val authState = viewModel.authState.collectAsState()
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
     val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
     
-    // Get the actual Activity from context
-    val activity = LocalContext.current as? androidx.activity.ComponentActivity
+    // Google Sign-In Manager
     val googleSignInManager = remember {
-        if (activity != null) {
-            // TODO: Replace with your actual Web Client ID from Google Cloud Console
-            val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
-            GoogleSignInManager(activity, webClientId)
-        } else null
+        // TODO: Replace with your actual Web Client ID from Google Cloud Console
+        val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        GoogleSignInManager(activity, webClientId)
     }
 
     // Launcher para Google Sign-In
@@ -89,10 +86,8 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                     },
                     onRegisterClick = { setShowLogin(false) },
                     onGoogleLoginClick = {
-                        if (googleSignInManager != null) {
-                            val signInIntent = googleSignInManager.getSignInIntent()
-                            googleSignInLauncher.launch(signInIntent)
-                        }
+                        val signInIntent = googleSignInManager.getSignInIntent()
+                        googleSignInLauncher.launch(signInIntent)
                     },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
