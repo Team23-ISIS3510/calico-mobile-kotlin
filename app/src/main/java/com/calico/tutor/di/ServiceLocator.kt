@@ -3,6 +3,7 @@ package com.calico.tutor.di
 import android.content.Context
 import com.calico.tutor.data.datasource.local.TokenManager
 import com.calico.tutor.data.datasource.remote.AuthApiService
+import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
@@ -22,6 +23,8 @@ object ServiceLocator {
     private var authApiService: AuthApiService? = null
     @Volatile
     private var subjectsApiService: SubjectsApiService? = null
+    @Volatile
+    private var analyticsApiService: AnalyticsApiService? = null
     @Volatile
     private var telemetryApiService: TelemetryApiService? = null
     @Volatile
@@ -88,10 +91,32 @@ object ServiceLocator {
         }
     }
 
+    private fun analyticsApiService(context: Context): AnalyticsApiService {
+        return analyticsApiService ?: synchronized(this) {
+            analyticsApiService ?: RetrofitClient.createAnalyticsApiService(
+                RetrofitClient.createRetrofit(
+                    RetrofitClient.createHttpClientWithTokenManagerAndLatency(
+                        getTokenManager(context)
+                    ) { endpoint, method, durationMs, statusCode ->
+                        telemetryRepository(context).reportLatency(
+                            endpoint = endpoint,
+                            latencyMs = durationMs,
+                            feature = "analytics",
+                            action = "session_alert_polling",
+                            method = method,
+                            statusCode = statusCode
+                        )
+                    }
+                )
+            ).also { analyticsApiService = it }
+        }
+    }
+
     fun analyticsRepository(context: Context): AnalyticsRepository {
         return analyticsRepository ?: synchronized(this) {
             analyticsRepository ?: AnalyticsRepositoryImpl(
-                subjectsApiService = subjectsApiService(context)
+                subjectsApiService = subjectsApiService(context),
+                analyticsApiService = analyticsApiService(context)
             ).also { analyticsRepository = it }
         }
     }

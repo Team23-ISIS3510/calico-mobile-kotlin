@@ -1,6 +1,8 @@
 package com.calico.tutor.data.repository
 
+import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
+import com.calico.tutor.data.dto.response.SessionAlertResponse
 import com.calico.tutor.data.service.TutoringDemandCalculatorService
 import com.calico.tutor.domain.model.TutorAnalyticsResponse
 import com.calico.tutor.domain.repository.AnalyticsRepository
@@ -12,7 +14,8 @@ import java.util.*
  * Obtiene datos de los endpoints existentes de SubjectsApiService y calcula analítica localmente
  */
 class AnalyticsRepositoryImpl(
-    private val subjectsApiService: SubjectsApiService
+    private val subjectsApiService: SubjectsApiService,
+    private val analyticsApiService: AnalyticsApiService
 ) : AnalyticsRepository {
     
     private val calculator = TutoringDemandCalculatorService()
@@ -83,6 +86,10 @@ class AnalyticsRepositoryImpl(
         
         // Calcular analítica
         return calculator.calculateAnalytics(sessions, emptyList())
+    }
+
+    override suspend fun getSessionAlert(): SessionAlertResponse {
+        return analyticsApiService.getSessionAlert()
     }
 }
 

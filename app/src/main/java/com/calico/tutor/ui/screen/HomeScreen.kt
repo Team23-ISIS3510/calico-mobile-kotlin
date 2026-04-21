@@ -58,6 +58,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.loadSessions(tutorId)
         viewModel.loadOccupancy(tutorId)
+        viewModel.startSessionAlertPolling()
     }
 
     // Extraer datos del estado de sesiones
