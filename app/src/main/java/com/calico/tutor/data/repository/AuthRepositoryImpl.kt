@@ -4,6 +4,7 @@ import com.calico.tutor.data.datasource.local.TokenManager
 import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.dto.request.LoginRequest
 import com.calico.tutor.data.dto.request.RegisterRequest
+import com.calico.tutor.data.dto.request.GoogleLoginRequest
 import com.calico.tutor.data.mapper.AuthMapper
 import com.calico.tutor.domain.model.AuthToken
 import com.calico.tutor.domain.repository.AuthRepository
@@ -51,6 +52,18 @@ class AuthRepositoryImpl(
             Result.Success(authToken)
         } catch (e: Exception) {
             Result.Error(e, e.localizedMessage ?: "Registration failed")
+        }
+    }
+
+    override suspend fun loginWithGoogle(idToken: String): Result<AuthToken> {
+        return try {
+            val request = GoogleLoginRequest(idToken = idToken)
+            val response = authApiService.loginWithGoogle(request)
+            val authToken = AuthMapper.toAuthToken(response)
+            tokenManager.saveToken(authToken.idToken, authToken.refreshToken, authToken.expiresIn)
+            Result.Success(authToken)
+        } catch (e: Exception) {
+            Result.Error(e, e.localizedMessage ?: "Google login failed")
         }
     }
 

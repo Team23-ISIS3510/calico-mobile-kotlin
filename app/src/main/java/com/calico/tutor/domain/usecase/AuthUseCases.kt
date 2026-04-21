@@ -95,3 +95,18 @@ class GetAuthTokenUseCase(
         return authRepository.getStoredToken()
     }
 }
+
+class GoogleLoginUseCase(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(idToken: String): Result<AuthToken> {
+        if (idToken.isBlank()) {
+            return Result.Error(
+                IllegalArgumentException("ID token cannot be empty"),
+                "Invalid Google authentication token"
+            )
+        }
+
+        return authRepository.loginWithGoogle(idToken)
+    }
+}

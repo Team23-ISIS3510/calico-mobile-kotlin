@@ -12,6 +12,7 @@ import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
+import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 
 object ServiceLocator {
     @Volatile
@@ -74,6 +75,9 @@ object ServiceLocator {
 
     fun getAuthTokenUseCase(context: Context): GetAuthTokenUseCase =
         GetAuthTokenUseCase(authRepository(context))
+
+    fun googleLoginUseCase(context: Context): GoogleLoginUseCase =
+        GoogleLoginUseCase(authRepository(context))
 
     // Expose TokenManager publicly
     fun provideTokenManager(context: Context): TokenManager =

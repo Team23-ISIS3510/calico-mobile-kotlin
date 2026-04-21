@@ -78,4 +78,8 @@ dependencies {
     testImplementation(libs.kotest.assertions)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Firebase & Google Play Services for Google Sign-In
+    implementation(libs.firebase.auth)
+    implementation(libs.google.play.services.auth)
 }

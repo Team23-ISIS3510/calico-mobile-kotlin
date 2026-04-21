@@ -10,6 +10,7 @@ import com.calico.tutor.domain.model.AuthToken
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
+import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 import com.calico.tutor.domain.utils.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +27,8 @@ sealed class AuthState {
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
-    private val getAuthTokenUseCase: GetAuthTokenUseCase
+    private val getAuthTokenUseCase: GetAuthTokenUseCase,
+    private val googleLoginUseCase: GoogleLoginUseCase
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
@@ -36,6 +38,7 @@ class AuthViewModel(
 
     private var lastLoginCredentials: Pair<String, String>? = null
     private var lastRegisterData: RegisterData? = null
+    private var lastGoogleIdToken: String? = null
 
     data class RegisterData(
         val email: String,
@@ -109,6 +112,34 @@ class AuthViewModel(
         }
     }
 
+    fun loginWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            lastGoogleIdToken = idToken
+
+            val result = googleLoginUseCase(idToken)
+            _authState.value = when (result) {
+                is Result.Success -> {
+                    lastGoogleIdToken = null
+                    AuthState.Success(result.data)
+                }
+                is Result.Error -> {
+                    val isNetworkError = isNetworkRelated(result.exception)
+                    if (isNetworkError) {
+                        retryQueue.enqueue("google_login") {
+                            googleLoginUseCase(idToken)
+                        }
+                    }
+                    AuthState.Error(
+                        result.message ?: "Google login failed",
+                        retryable = isNetworkError
+                    )
+                }
+                is Result.Loading -> AuthState.Loading
+            }
+        }
+    }
+
     fun retryFailedOperation() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -121,6 +152,9 @@ class AuthViewModel(
                 lastRegisterData != null -> {
                     val data = lastRegisterData!!
                     register(data.email, data.password, data.name, data.phone, data.isTutor, data.courses)
+                }
+                lastGoogleIdToken != null -> {
+                    loginWithGoogle(lastGoogleIdToken!!)
                 }
                 retryQueue.getPendingRequests() > 0 -> {
                     val results = retryQueue.retryAll()
@@ -181,6 +215,7 @@ class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
     private val loginUseCase = ServiceLocator.loginUseCase(context)
     private val registerUseCase = ServiceLocator.registerUseCase(context)
     private val getAuthTokenUseCase = ServiceLocator.getAuthTokenUseCase(context)
+    private val googleLoginUseCase = ServiceLocator.googleLoginUseCase(context)
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
@@ -188,7 +223,8 @@ class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
             return AuthViewModel(
                 loginUseCase = loginUseCase,
                 registerUseCase = registerUseCase,
-                getAuthTokenUseCase = getAuthTokenUseCase
+                getAuthTokenUseCase = getAuthTokenUseCase,
+                googleLoginUseCase = googleLoginUseCase
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

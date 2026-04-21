@@ -1,5 +1,6 @@
 package com.calico.tutor.ui.screen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ import com.calico.tutor.ui.theme.PrimaryOrange
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit,
     onRegisterClick: () -> Unit,
+    onGoogleLoginClick: (() -> Unit)? = null,
     isLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
@@ -176,6 +178,56 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Google Login Button
+            if (onGoogleLoginClick != null) {
+                Button(
+                    onClick = onGoogleLoginClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading,
+                    border = BorderStroke(
+                        1.dp,
+                        Color(0xFFE0E0E0)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Google Icon (using a simple circle representation)
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "G",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFEA4335)
+                            )
+                        }
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Text(
+                            "Sign in with Google",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.Black
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Register Button
             Button(
