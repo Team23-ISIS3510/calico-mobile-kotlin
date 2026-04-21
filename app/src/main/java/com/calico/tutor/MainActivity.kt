@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
@@ -17,6 +18,9 @@ import com.calico.tutor.ui.viewmodel.ShakeDetectorViewModelFactory
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.domain.model.ShakeDetectorState
 import com.calico.tutor.ui.component.BugReportDialog
+import android.os.Build
+import android.Manifest
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     private lateinit var shakeDetectorViewModel: ShakeDetectorViewModel
@@ -24,6 +28,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Request notification permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationPermissionLauncher = registerForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                if (isGranted) {
+                    Log.d("MainActivity", "POST_NOTIFICATIONS permission granted")
+                } else {
+                    Log.w("MainActivity", "POST_NOTIFICATIONS permission denied")
+                }
+            }
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         
         // Initialize ShakeDetectorViewModel early for lifecycle management
         val factory = ShakeDetectorViewModelFactory(applicationContext)

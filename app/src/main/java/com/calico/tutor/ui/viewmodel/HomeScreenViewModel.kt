@@ -7,11 +7,14 @@ import androidx.lifecycle.viewModelScope
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.calico.tutor.data.dto.response.TutorOccupancyData
+import com.calico.tutor.data.dto.response.SessionAlertResponse
 import com.calico.tutor.domain.utils.Result
+import com.calico.tutor.util.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import android.util.Log
 
 /**
@@ -38,8 +41,17 @@ sealed class OccupancyState {
 }
 
 /**
+ * Estados UI para session alert
+ */
+sealed class SessionAlertState {
+    object Idle : SessionAlertState()
+    data class Alert(val response: SessionAlertResponse) : SessionAlertState()
+    data class Error(val message: String) : SessionAlertState()
+}
+
+/**
  * ViewModel para HomeScreen
- * Maneja la lógica de carga de sesiones previas, próximas y datos de ocupancy
+ * Maneja la lógica de carga de sesiones previas, próximas, datos de ocupancy y polling de alertas
  */
 class HomeScreenViewModel(
     private val context: Context
@@ -56,6 +68,13 @@ class HomeScreenViewModel(
     // Nombre del tutor
     private val _tutorName = MutableStateFlow<String>("")
     val tutorName: StateFlow<String> = _tutorName.asStateFlow()
+
+    // Estado de session alert
+    private val _sessionAlertState = MutableStateFlow<SessionAlertState>(SessionAlertState.Idle)
+    val sessionAlertState: StateFlow<SessionAlertState> = _sessionAlertState.asStateFlow()
+
+    // Track shown notifications to prevent duplicates
+    private val shownNotifications = mutableSetOf<String>()
 
     /**
      * Carga datos de sesiones previas y próximas
@@ -139,6 +158,64 @@ class HomeScreenViewModel(
             } catch (e: Exception) {
                 Log.e("HomeScreenViewModel", "Error loading occupancy: ${e.message}")
                 _occupancyState.value = OccupancyState.Error("Error loading occupancy: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Starts polling for session alerts every 60 seconds
+     * Automatically shows notifications when alerts are available
+     */
+    fun startSessionAlertPolling() {
+        viewModelScope.launch {
+            Log.d("SessionAlertPolling", "Starting session alert polling (every 60 seconds)")
+            NotificationHelper.createNotificationChannel(context)
+            
+            while (true) {
+                try {
+                    Log.d("SessionAlertPolling", "Fetching session alert from /analytics/session-alert...")
+                    val analyticsRepository = ServiceLocator.analyticsRepository(context)
+                    val alertResponse = analyticsRepository.getSessionAlert()
+                    
+                    Log.d("SessionAlertPolling", "Alert response received: hasAlert=${alertResponse.hasAlert}, studentName=${alertResponse.studentName}, minutesToStart=${alertResponse.minutesToStart}, sessionId=${alertResponse.sessionId}")
+                    
+                    _sessionAlertState.value = SessionAlertState.Alert(alertResponse)
+                    
+                    // Show notification if alert is true and hasn't been shown yet
+                    if (alertResponse.hasAlert && 
+                        alertResponse.studentName != null && 
+                        alertResponse.minutesToStart != null) {
+                        
+                        // Use sessionId from response, or generate one from student name if missing
+                        val sessionId = alertResponse.sessionId ?: alertResponse.studentName
+                        val notificationKey = sessionId
+                        
+                        if (!shownNotifications.contains(notificationKey)) {
+                            Log.d("SessionAlertPolling", "Showing notification for ${alertResponse.studentName}")
+                            NotificationHelper.showSessionAlertNotification(
+                                context = context,
+                                studentName = alertResponse.studentName,
+                                minutesToStart = alertResponse.minutesToStart,
+                                sessionId = sessionId
+                            )
+                            shownNotifications.add(notificationKey)
+                            Log.d("SessionAlertPolling", "Session alert notification shown for ${alertResponse.studentName}")
+                        } else {
+                            Log.d("SessionAlertPolling", "Notification already shown for session $sessionId, skipping duplicate")
+                        }
+                    } else {
+                        Log.d("SessionAlertPolling", "No alert to show (hasAlert=false or missing fields)")
+                    }
+                    
+                    // Poll every 60 seconds
+                    Log.d("SessionAlertPolling", "Waiting 60 seconds before next poll...")
+                    delay(60000)
+                } catch (e: Exception) {
+                    Log.e("SessionAlertPolling", "Error polling session alerts: ${e.message}", e)
+                    _sessionAlertState.value = SessionAlertState.Error("Error checking for alerts: ${e.message}")
+                    // Retry after delay even on error
+                    delay(60000)
+                }
             }
         }
     }
