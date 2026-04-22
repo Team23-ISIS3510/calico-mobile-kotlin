@@ -107,6 +107,3 @@ class TokenManager(private val context: Context) {
         private const val KEY_SAVE_TIME = "save_time"
     }
 }
-        private const val KEY_EXPIRES_IN = "expires_in"
-    }
-}
