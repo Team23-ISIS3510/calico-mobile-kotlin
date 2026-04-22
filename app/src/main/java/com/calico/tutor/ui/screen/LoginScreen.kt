@@ -50,6 +50,7 @@ fun LoginScreen(
     onRegisterClick: () -> Unit,
     onGoogleLoginClick: (() -> Unit)? = null,
     isLoading: Boolean = false,
+    isGoogleLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
     onRetry: (() -> Unit)? = null
@@ -191,38 +192,42 @@ fun LoginScreen(
                         contentColor = Color.Black
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !isLoading,
-                    border = BorderStroke(
-                        1.dp,
-                        Color(0xFFE0E0E0)
-                    )
+                    enabled = !isLoading && !isGoogleLoading,
+                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Google Icon (using a simple circle representation)
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
+                    if (isGoogleLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color(0xFFEA4335),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "G",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEA4335)
+                                )
+                            }
+                            Spacer(modifier = Modifier.size(12.dp))
                             Text(
-                                "G",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFEA4335)
+                                "Sign in with Google",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Black
                             )
                         }
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Text(
-                            "Sign in with Google",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.Black
-                        )
                     }
                 }
 

@@ -1,6 +1,7 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -114,17 +115,22 @@ class AuthViewModel(
 
     fun loginWithGoogle(idToken: String, email: String? = null) {
         viewModelScope.launch {
+            Log.d("AuthViewModel", "loginWithGoogle llamado. email: ${email?.take(5)}")
             _authState.value = AuthState.Loading
             lastGoogleIdToken = idToken
 
             val result = googleLoginUseCase(idToken, email)
+            Log.d("AuthViewModel", "Resultado de googleLoginUseCase: ${result::class.simpleName}")
+
             _authState.value = when (result) {
                 is Result.Success -> {
                     lastGoogleIdToken = null
+                    Log.d("AuthViewModel", "Google login exitoso, token recibido")
                     AuthState.Success(result.data)
                 }
                 is Result.Error -> {
                     val isNetworkError = isNetworkRelated(result.exception)
+                    Log.e("AuthViewModel", "Google login falló: ${result.message}, networkError=$isNetworkError")
                     if (isNetworkError) {
                         retryQueue.enqueue("google_login") {
                             googleLoginUseCase(idToken, email)
