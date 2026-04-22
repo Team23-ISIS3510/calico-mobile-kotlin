@@ -1,9 +1,11 @@
 package com.calico.tutor.ui.screen
 
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,15 +22,28 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     val authState = viewModel.authState.collectAsState()
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
     val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
+    val (errorToShow, setErrorToShow) = remember { mutableStateOf<String?>(null) }
     
     // Lazy initialization of Google Sign-In Manager
     val googleSignInManager = remember(activity) {
         try {
             val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
-            GoogleSignInManager(activity, webClientId)
+            if (webClientId == "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com") {
+                setErrorToShow("❌ ERROR: Reemplaza 'YOUR_WEB_CLIENT_ID' con tu Web Client ID de Google Cloud Console")
+                null
+            } else {
+                GoogleSignInManager(activity, webClientId)
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            setErrorToShow("Error inicializando Google Sign-In: ${e.localizedMessage}")
             null
+        }
+    }
+
+    // Mostrar errores con Toast
+    LaunchedEffect(errorToShow) {
+        errorToShow?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -41,9 +56,20 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             val account = task.getResult(ApiException::class.java)
             if (account?.idToken != null) {
                 viewModel.loginWithGoogle(account.idToken!!)
+            } else {
+                setErrorToShow("Error: No se obtuvo el ID Token de Google")
             }
         } catch (e: ApiException) {
-            e.printStackTrace()
+            val errorMessage = when (e.statusCode) {
+                12500 -> "Google Play Services está desactualizado"
+                12501 -> "El usuario canceló el inicio de sesión"
+                12502 -> "Los servicios de Google no están disponibles en tu dispositivo"
+                12503 -> "La clave de API de Google no es válida"
+                else -> "Error de Google Sign-In: ${e.message}"
+            }
+            setErrorToShow(errorMessage)
+        } catch (e: Exception) {
+            setErrorToShow("Error inesperado: ${e.localizedMessage}")
         }
     }
 
@@ -89,13 +115,15 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     },
                     onRegisterClick = { setShowLogin(false) },
                     onGoogleLoginClick = {
-                        try {
-                            val signInIntent = googleSignInManager?.getSignInIntent()
-                            if (signInIntent != null) {
+                        if (googleSignInManager == null) {
+                            setErrorToShow("❌ Google Sign-In no está configurado. Reemplaza 'YOUR_WEB_CLIENT_ID' con tu Web Client ID")
+                        } else {
+                            try {
+                                val signInIntent = googleSignInManager.getSignInIntent()
                                 googleSignInLauncher.launch(signInIntent)
+                            } catch (e: Exception) {
+                                setErrorToShow("Error iniciando Google Sign-In: ${e.localizedMessage}")
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
                         }
                     },
                     isLoading = authState.value is AuthState.Loading,

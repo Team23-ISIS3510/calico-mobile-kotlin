@@ -1,6 +1,7 @@
 package com.calico.tutor.data.datasource.remote
 
 import android.content.Context
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -16,26 +17,34 @@ class GoogleSignInManager(
 ) {
     private val googleSignInClient: GoogleSignInClient
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val TAG = "GoogleSignInManager"
 
     init {
+        Log.d(TAG, "Inicializando GoogleSignInManager con Web Client ID: ${webClientId.take(20)}...")
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(webClientId)
             .requestEmail()
             .build()
 
         googleSignInClient = GoogleSignIn.getClient(context, gso)
+        Log.d(TAG, "GoogleSignInClient configurado correctamente")
     }
 
     fun getSignInIntent() = googleSignInClient.signInIntent
 
     suspend fun signInWithGoogle(idToken: String): GoogleSignInResult {
         return try {
+            Log.d(TAG, "Iniciando autenticación con Firebase usando idToken")
+            
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = firebaseAuth.signInWithCredential(credential).await()
             
             val user = authResult.user
             if (user != null) {
+                Log.d(TAG, "Usuario autenticado en Firebase: ${user.email}")
                 val token = user.getIdToken(false).await().token
+                
+                Log.d(TAG, "Token obtenido exitosamente")
                 GoogleSignInResult.Success(
                     userId = user.uid,
                     email = user.email ?: "",
@@ -43,10 +52,16 @@ class GoogleSignInManager(
                     idToken = token ?: idToken
                 )
             } else {
-                GoogleSignInResult.Error("User not found after authentication")
+                Log.e(TAG, "Usuario no encontrado después de autenticación en Firebase")
+                GoogleSignInResult.Error("Usuario no encontrado después de autenticación en Firebase")
             }
         } catch (e: Exception) {
-            GoogleSignInResult.Error(e.message ?: "Unknown error during Google Sign-In")
+            Log.e(TAG, "Error durante Google Sign-In: ${e.message}", e)
+            val errorMessage = when (e) {
+                is ApiException -> "Error de API de Google: ${e.message}"
+                else -> "Error durante autenticación: ${e.message}"
+            }
+            GoogleSignInResult.Error(errorMessage)
         }
     }
 

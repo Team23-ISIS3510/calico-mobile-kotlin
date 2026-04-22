@@ -196,6 +196,25 @@ class AuthViewModel(
         }
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val result = clearTokenUseCase()
+            _authState.value = when (result) {
+                is Result.Success -> {
+                    AuthState.Idle
+                }
+                is Result.Error -> {
+                    AuthState.Error(
+                        result.message ?: "Logout failed",
+                        retryable = false
+                    )
+                }
+                is Result.Loading -> AuthState.Loading
+            }
+        }
+    }
+
     fun resetState() {
         _authState.value = AuthState.Idle
     }
