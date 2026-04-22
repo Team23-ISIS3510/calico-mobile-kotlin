@@ -27,7 +27,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     // Lazy initialization of Google Sign-In Manager
     val googleSignInManager = remember(activity) {
         try {
-            val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+            val webClientId = "395373135024-f61efd2la6l58c3pv3kvegm569bfon0a.apps.googleusercontent.com"
             if (webClientId == "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com") {
                 setErrorToShow("❌ ERROR: Reemplaza 'YOUR_WEB_CLIENT_ID' con tu Web Client ID de Google Cloud Console")
                 null
