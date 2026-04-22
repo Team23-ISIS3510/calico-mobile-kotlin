@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.calico.tutor.BuildConfig
 import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
@@ -28,8 +29,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
 
     val googleSignInManager = remember(activity) {
         try {
-            val webClientId = "395373135024-f61efd2la6l58c3pv3kvegm569bfon0a.apps.googleusercontent.com"
-            GoogleSignInManager(activity, webClientId)
+            GoogleSignInManager(activity, BuildConfig.GOOGLE_WEB_CLIENT_ID)
         } catch (e: Exception) {
             setErrorToShow("Error inicializando Google Sign-In: ${e.localizedMessage}")
             null
