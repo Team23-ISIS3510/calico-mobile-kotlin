@@ -6,36 +6,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryOrange,
-    onPrimary = DarkGray,
-    primaryContainer = Color(0xFFFFF8E1),
-    onPrimaryContainer = Color(0xFF3F3000),
+    // Primary Colors - Calico Yellow
+    primary = CalicoYellow,
+    onPrimary = TextColorBlack,
+    primaryContainer = CalicoYellow,
+    onPrimaryContainer = TextColorBlack,
     
-    secondary = SecondaryOrange,
-    onSecondary = WhiteBase,
-    secondaryContainer = Color(0xFFFFE5CC),
-    onSecondaryContainer = Color(0xFF4D2800),
+    // Secondary Colors - Calico Button Orange
+    secondary = CalicoButtonOrange,
+    onSecondary = TextColorBlack,
+    secondaryContainer = CalicoBulletColor,
+    onSecondaryContainer = TextColorBlack,
     
-    tertiary = AccentMagenta,
-    onTertiary = WhiteBase,
-    tertiaryContainer = Color(0xFFF8D8E8),
-    onTertiaryContainer = Color(0xFF3D1F3D),
+    // Tertiary Colors - Brand accent
+    tertiary = CalicoOrange,
+    onTertiary = TextColorBlack,
+    tertiaryContainer = CalicoBulletColor,
+    onTertiaryContainer = TextColorBlack,
     
     error = ErrorRed,
     onError = WhiteBase,
     errorContainer = Color(0xFFFFEBEE),
     onErrorContainer = Color(0xFF410002),
     
-    background = Background,
-    onBackground = OnBackground,
-    surface = Surface,
-    onSurface = OnSurface,
-    surfaceVariant = SurfaceVariant,
-    onSurfaceVariant = MediumGray,
+    // Backgrounds
+    background = MainBackground,
+    onBackground = TextColorBlack,
+    surface = MenuBackground,
+    onSurface = TextColorBlack,
+    surfaceVariant = MaterialsBackground,
+    onSurfaceVariant = IconColorBrown,
     
-    outline = Color(0xFF99889A),
+    outline = IconColorBrown,
     outlineVariant = OutlineVariant,
-    scrim = Color(0xFF000000)
+    scrim = PopupEffectOverlay
 )
 
 @Composable

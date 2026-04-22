@@ -1,0 +1,11 @@
+package com.calico.tutor.data.datasource.remote
+
+import com.calico.tutor.data.dto.request.BugReportRequest
+import retrofit2.Response
+import retrofit2.http.Body
+import retrofit2.http.POST
+
+interface TelemetryApiService {
+    @POST("analytics/bug")
+    suspend fun reportBug(@Body request: BugReportRequest): Response<Unit>
+}

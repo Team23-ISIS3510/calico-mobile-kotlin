@@ -37,9 +37,7 @@ fun RecommendedSubjectsScreen(
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
             
-            // Process data from the endpoint
             if (response.data != null) {
-                // Group by courseId and course to get unique subjects
                 val courseMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
@@ -54,7 +52,6 @@ fun RecommendedSubjectsScreen(
                     }
                 }
                 
-                // Convert to Subject and sort by frequency (top 3)
                 subjects = courseMap.entries.map { (courseId, nameAndCount) ->
                     Subject(
                         id = courseId,
@@ -117,7 +114,6 @@ fun RecommendedSubjectsScreen(
                 }
             }
 
-            // Content
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -145,13 +141,13 @@ fun RecommendedSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFFEBEE)
+                            containerColor = ErrorCardBackground
                         )
                     ) {
                         Text(
                             text = error ?: "Unknown error",
                             modifier = Modifier.padding(16.dp),
-                            color = Color(0xFFC62828),
+                            color = ErrorCardText,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -198,7 +194,6 @@ fun RecommendedSubjectsScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Apply Button
                     Button(
                         onClick = {
                             val selectedItems = subjects.filter { it.id in selectedSubjects }
@@ -240,7 +235,7 @@ private fun RecommendedSubjectItem(
             .shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFFFFF3E0) else Surface
+            containerColor = if (isSelected) CalicoBulletColor else Surface
         )
     ) {
         Row(

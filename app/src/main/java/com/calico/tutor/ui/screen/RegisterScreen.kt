@@ -46,7 +46,10 @@ import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
+import com.calico.tutor.ui.theme.TextColorBlack
+import com.calico.tutor.util.EmailValidator
 
 @Composable
 fun RegisterScreen(
@@ -63,11 +66,23 @@ fun RegisterScreen(
     val (phone, setPhone) = remember { mutableStateOf("") }
     val (isTutor, setIsTutor) = remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    
+    // Validation state
+    val emailError = remember(email) {
+        if (email.isNotBlank() && !EmailValidator.isValidEmail(email)) {
+            "Invalid email format"
+        } else {
+            null
+        }
+    }
+    
+    val validationError = emailError
+    val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(MainBackground)
     ) {
         Column(
             modifier = Modifier
@@ -85,7 +100,7 @@ fun RegisterScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.Black
+                        tint = TextColorBlack
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -121,11 +136,23 @@ fun RegisterScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black
+                    focusedTextColor = TextColorBlack,
+                    unfocusedTextColor = TextColorBlack
                 ),
-                singleLine = true
+                singleLine = true,
+                isError = validationError != null
             )
+            
+            // Email validation error in red
+            if (validationError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    validationError,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -227,10 +254,12 @@ fun RegisterScreen(
                 )
             }
 
-            if (errorMessage != null) {
+            // Authentication error from backend
+            val authenticationError = if (validationError == null && errorMessage != null) errorMessage else null
+            if (authenticationError != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    errorMessage,
+                    authenticationError,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
@@ -241,7 +270,9 @@ fun RegisterScreen(
 
             // Register Button
             Button(
-                onClick = { onRegisterClick(email, password, name, phone, isTutor) },
+                onClick = {
+                    onRegisterClick(email.trim(), password, name.trim(), phone.trim(), isTutor)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -251,7 +282,7 @@ fun RegisterScreen(
                 ),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty() && 
-                         name.isNotEmpty() && phone.isNotEmpty()
+                         name.isNotEmpty() && phone.isNotEmpty() && validationError == null
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
