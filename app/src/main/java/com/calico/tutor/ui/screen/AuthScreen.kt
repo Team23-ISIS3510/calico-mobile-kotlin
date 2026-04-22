@@ -9,13 +9,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.delay
 
 @Composable
 fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.activity.ComponentActivity) {
@@ -23,17 +23,13 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
     val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
     val (errorToShow, setErrorToShow) = remember { mutableStateOf<String?>(null) }
-    
-    // Lazy initialization of Google Sign-In Manager
+
+    val tokenManager = remember { ServiceLocator.provideTokenManager(context) }
+
     val googleSignInManager = remember(activity) {
         try {
             val webClientId = "395373135024-f61efd2la6l58c3pv3kvegm569bfon0a.apps.googleusercontent.com"
-            if (webClientId == "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com") {
-                setErrorToShow("❌ ERROR: Reemplaza 'YOUR_WEB_CLIENT_ID' con tu Web Client ID de Google Cloud Console")
-                null
-            } else {
-                GoogleSignInManager(activity, webClientId)
-            }
+            GoogleSignInManager(activity, webClientId)
         } catch (e: Exception) {
             setErrorToShow("Error inicializando Google Sign-In: ${e.localizedMessage}")
             null
@@ -47,6 +43,23 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
         }
     }
 
+    // Monitorear expiración del token y refrescar silenciosamente
+    LaunchedEffect(authState.value) {
+        if (authState.value is AuthState.Success && googleSignInManager != null) {
+            while (true) {
+                delay(60_000L) // revisar cada minuto
+                if (tokenManager.isTokenExpiringSoon()) {
+                    val newIdToken = googleSignInManager.silentSignIn()
+                    if (newIdToken != null) {
+                        viewModel.loginWithGoogle(newIdToken)
+                    }
+                    // Si silentSignIn falla, el usuario seguirá usando el token actual
+                    // hasta que expire y reciba un 401
+                }
+            }
+        }
+    }
+
     // Launcher para Google Sign-In
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -55,17 +68,18 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             val account = task.getResult(ApiException::class.java)
             if (account?.idToken != null) {
-                viewModel.loginWithGoogle(account.idToken!!)
+                viewModel.loginWithGoogle(account.idToken!!, account.email)
             } else {
                 setErrorToShow("Error: No se obtuvo el ID Token de Google")
             }
         } catch (e: ApiException) {
             val errorMessage = when (e.statusCode) {
+                10 -> "Error de configuración: registra el SHA-1 del app en Google Cloud Console"
                 12500 -> "Google Play Services está desactualizado"
                 12501 -> "El usuario canceló el inicio de sesión"
                 12502 -> "Los servicios de Google no están disponibles en tu dispositivo"
                 12503 -> "La clave de API de Google no es válida"
-                else -> "Error de Google Sign-In: ${e.message}"
+                else -> "Error de Google Sign-In (código ${e.statusCode}): ${e.message}"
             }
             setErrorToShow(errorMessage)
         } catch (e: Exception) {
@@ -76,8 +90,6 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     // Si el usuario está autenticado, mostrar HomeScreen
     when (val state = authState.value) {
         is AuthState.Success -> {
-            // Usuario autenticado - mostrar Home Page
-            val tokenManager = ServiceLocator.provideTokenManager(context)
             val email = tokenManager.getEmail() ?: state.token.idToken
             val userName = email
                 .substringBefore("@")
@@ -116,7 +128,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     onRegisterClick = { setShowLogin(false) },
                     onGoogleLoginClick = {
                         if (googleSignInManager == null) {
-                            setErrorToShow("❌ Google Sign-In no está configurado. Reemplaza 'YOUR_WEB_CLIENT_ID' con tu Web Client ID")
+                            setErrorToShow("Google Sign-In no disponible. Reinicia la app.")
                         } else {
                             try {
                                 val signInIntent = googleSignInManager.getSignInIntent()

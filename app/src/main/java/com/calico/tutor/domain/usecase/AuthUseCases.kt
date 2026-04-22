@@ -99,7 +99,7 @@ class GetAuthTokenUseCase(
 class GoogleLoginUseCase(
     private val authRepository: AuthRepository
 ) {
-    suspend operator fun invoke(idToken: String): Result<AuthToken> {
+    suspend operator fun invoke(idToken: String, email: String? = null): Result<AuthToken> {
         if (idToken.isBlank()) {
             return Result.Error(
                 IllegalArgumentException("ID token cannot be empty"),
@@ -107,6 +107,6 @@ class GoogleLoginUseCase(
             )
         }
 
-        return authRepository.loginWithGoogle(idToken)
+        return authRepository.loginWithGoogle(idToken, email)
     }
 }

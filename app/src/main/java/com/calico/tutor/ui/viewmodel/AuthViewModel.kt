@@ -112,12 +112,12 @@ class AuthViewModel(
         }
     }
 
-    fun loginWithGoogle(idToken: String) {
+    fun loginWithGoogle(idToken: String, email: String? = null) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             lastGoogleIdToken = idToken
 
-            val result = googleLoginUseCase(idToken)
+            val result = googleLoginUseCase(idToken, email)
             _authState.value = when (result) {
                 is Result.Success -> {
                     lastGoogleIdToken = null
@@ -127,7 +127,7 @@ class AuthViewModel(
                     val isNetworkError = isNetworkRelated(result.exception)
                     if (isNetworkError) {
                         retryQueue.enqueue("google_login") {
-                            googleLoginUseCase(idToken)
+                            googleLoginUseCase(idToken, email)
                         }
                     }
                     AuthState.Error(

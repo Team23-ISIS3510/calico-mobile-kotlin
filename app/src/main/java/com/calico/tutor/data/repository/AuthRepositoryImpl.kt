@@ -55,14 +55,15 @@ class AuthRepositoryImpl(
         }
     }
 
-    override suspend fun loginWithGoogle(idToken: String): Result<AuthToken> {
+    override suspend fun loginWithGoogle(idToken: String, email: String?): Result<AuthToken> {
         return try {
             val request = GoogleLoginRequest(idToken = idToken)
             val response = authApiService.loginWithGoogle(request)
             val authToken = AuthMapper.toAuthToken(response)
             tokenManager.saveToken(authToken.idToken, authToken.refreshToken, authToken.expiresIn)
-            // Intenta extraer y guardar el email del token JWT si es posible
-            // De lo contrario, lo guardará cuando esté disponible en otra solicitud
+            if (!email.isNullOrBlank()) {
+                tokenManager.saveEmail(email)
+            }
             Result.Success(authToken)
         } catch (e: Exception) {
             Result.Error(e, e.localizedMessage ?: "Google login failed")

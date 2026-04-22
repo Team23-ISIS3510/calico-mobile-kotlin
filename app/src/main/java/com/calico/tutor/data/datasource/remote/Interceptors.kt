@@ -8,17 +8,8 @@ import okhttp3.Route
 
 class TokenAuthenticator(private val tokenManager: TokenManager) : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
-        if (response.code == 401) {
-            synchronized(this) {
-                val newToken = tokenManager.getRefreshToken()
-                
-                if (newToken != null) {
-                    return response.request.newBuilder()
-                        .header("Authorization", "Bearer $newToken")
-                        .build()
-                }
-            }
-        }
+        // No reintentamos con refreshToken como bearer — el backend no acepta ese flujo.
+        // El token expirado se maneja proactivamente en AuthScreen con silent sign-in.
         return null
     }
 }
