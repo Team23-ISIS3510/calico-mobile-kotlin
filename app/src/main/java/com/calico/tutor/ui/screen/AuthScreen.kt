@@ -21,11 +21,15 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
     val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
     
-    // Google Sign-In Manager
-    val googleSignInManager = remember {
-        // TODO: Replace with your actual Web Client ID from Google Cloud Console
-        val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
-        GoogleSignInManager(activity, webClientId)
+    // Lazy initialization of Google Sign-In Manager
+    val googleSignInManager = remember(activity) {
+        try {
+            val webClientId = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+            GoogleSignInManager(activity, webClientId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     // Launcher para Google Sign-In
@@ -39,7 +43,6 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                 viewModel.loginWithGoogle(account.idToken!!)
             }
         } catch (e: ApiException) {
-            // Handle error
             e.printStackTrace()
         }
     }
@@ -86,8 +89,14 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     },
                     onRegisterClick = { setShowLogin(false) },
                     onGoogleLoginClick = {
-                        val signInIntent = googleSignInManager.getSignInIntent()
-                        googleSignInLauncher.launch(signInIntent)
+                        try {
+                            val signInIntent = googleSignInManager?.getSignInIntent()
+                            if (signInIntent != null) {
+                                googleSignInLauncher.launch(signInIntent)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
