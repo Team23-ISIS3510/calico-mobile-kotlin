@@ -75,6 +75,10 @@ class HomeScreenViewModel(
 
     // Track shown notifications to prevent duplicates
     private val shownNotifications = mutableSetOf<String>()
+    
+    // Track if connection warning has been shown recently (to avoid spamming)
+    private var lastConnectionWarningTime: Long = 0
+    private val CONNECTION_WARNING_COOLDOWN_MS = 300000L // 5 minutes
 
     /**
      * Carga datos de sesiones previas y próximas
@@ -200,6 +204,28 @@ class HomeScreenViewModel(
                             )
                             shownNotifications.add(notificationKey)
                             Log.d("SessionAlertPolling", "Session alert notification shown for ${alertResponse.studentName}")
+                            
+                            // If session is within 15 minutes, check network latency
+                            if (alertResponse.minutesToStart <= 15) {
+                                Log.d("SessionAlertPolling", "Session within 15 minutes, measuring network latency...")
+                                delay(500) // Small delay before latency check
+                                
+                                val latency = measureNetworkLatency()
+                                
+                                // Show connection warning if latency > 500ms and cooldown has passed
+                                if (latency > 500) {
+                                    val currentTime = System.currentTimeMillis()
+                                    if (currentTime - lastConnectionWarningTime > CONNECTION_WARNING_COOLDOWN_MS) {
+                                        Log.d("SessionAlertPolling", "High latency detected (${latency}ms > 500ms), showing connection warning")
+                                        NotificationHelper.showConnectionWarningNotification(context, latency)
+                                        lastConnectionWarningTime = currentTime
+                                    } else {
+                                        Log.d("SessionAlertPolling", "High latency detected (${latency}ms) but connection warning cooldown active")
+                                    }
+                                } else {
+                                    Log.d("SessionAlertPolling", "Network latency is good (${latency}ms <= 500ms)")
+                                }
+                            }
                         } else {
                             Log.d("SessionAlertPolling", "Notification already shown for session $sessionId, skipping duplicate")
                         }
@@ -226,6 +252,42 @@ class HomeScreenViewModel(
     fun refreshData(tutorId: String) {
         loadSessions(tutorId)
         loadOccupancy(tutorId)
+    }
+
+    /**
+     * Measures network latency by pinging the backend health endpoint
+     * Returns the average latency in milliseconds
+     */
+    private suspend fun measureNetworkLatency(): Long {
+        return try {
+            val latencies = mutableListOf<Long>()
+            
+            // Take 3 latency measurements
+            repeat(3) { attempt ->
+                try {
+                    val startTime = System.currentTimeMillis()
+                    val subjectsApiService = ServiceLocator.subjectsApiService(context)
+                    // Simple health check by calling getTutorProfile with a dummy ID
+                    // This measures actual backend connectivity
+                    subjectsApiService.getTutorProfile("health-check")
+                    val latency = System.currentTimeMillis() - startTime
+                    latencies.add(latency)
+                    Log.d("LatencyMeasurement", "Ping attempt ${attempt + 1}: ${latency}ms")
+                } catch (e: Exception) {
+                    // On error, record as higher latency penalty
+                    latencies.add(2000L)
+                    Log.w("LatencyMeasurement", "Ping attempt ${attempt + 1} failed: ${e.message}")
+                }
+                delay(100) // Small delay between attempts
+            }
+            
+            val averageLatency = latencies.average().toLong()
+            Log.d("LatencyMeasurement", "Average latency: ${averageLatency}ms (samples: $latencies)")
+            averageLatency
+        } catch (e: Exception) {
+            Log.e("LatencyMeasurement", "Error measuring latency: ${e.message}")
+            2000 // Assume worst case on measurement error
+        }
     }
 }
 
