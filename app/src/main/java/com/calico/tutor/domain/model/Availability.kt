@@ -6,7 +6,7 @@ data class AvailabilityItem(
     val date: String,
     val startTime: String,
     val endTime: String,
-    val location: String,
-    val description: String?,
-    val course: String?
+    val location: String? = null,
+    val description: String? = null,
+    val course: String? = null
 )

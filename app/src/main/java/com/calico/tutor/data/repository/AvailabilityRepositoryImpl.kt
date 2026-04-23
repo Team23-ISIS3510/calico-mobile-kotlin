@@ -8,6 +8,8 @@ import com.calico.tutor.domain.model.AvailabilityItem
 import com.calico.tutor.domain.repository.AvailabilityRepository
 import com.calico.tutor.domain.utils.Result
 import retrofit2.HttpException
+import java.text.SimpleDateFormat
+import java.util.*
 
 private const val TAG = "AvailabilityRepo"
 
@@ -19,8 +21,11 @@ class AvailabilityRepositoryImpl(
         return try {
             Log.d(TAG, "Cargando disponibilidades para tutor: $tutorId")
             val response = apiService.getAvailabilities(tutorId)
-            val items = response.getList().map { it.toModel() }
-            Log.d(TAG, "Disponibilidades cargadas: ${items.size}")
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val items = response.getList()
+                .map { it.toModel() }
+                .filter { it.date > today }
+            Log.d(TAG, "Disponibilidades futuras: ${items.size}")
             Result.Success(items)
         } catch (e: HttpException) {
             if (e.code() == 404) {
@@ -44,7 +49,7 @@ class AvailabilityRepositoryImpl(
             Result.Success(response.toModel())
         } catch (e: Exception) {
             Log.e(TAG, "Error creando disponibilidad: ${e.message}", e)
-            Result.Error(e, e.localizedMessage ?: "Error creando disponibilidad")
+            Result.Error(e, "Server error. Please try again later")
         }
     }
 
@@ -56,19 +61,26 @@ class AvailabilityRepositoryImpl(
             Result.Success(response.toModel())
         } catch (e: Exception) {
             Log.e(TAG, "Error actualizando disponibilidad: ${e.message}", e)
-            Result.Error(e, e.localizedMessage ?: "Error actualizando disponibilidad")
+            Result.Error(e, "Server error. Please try again later")
         }
     }
 
     override suspend fun deleteAvailability(id: String): Result<Unit> {
         return try {
             Log.d(TAG, "Eliminando disponibilidad id: $id")
-            apiService.deleteAvailability(id)
-            Log.d(TAG, "Disponibilidad eliminada")
-            Result.Success(Unit)
+            val response = apiService.deleteAvailability(id)
+            if (response.code() == 404) {
+                Result.Error(Exception("404"), "Availability not found")
+            } else {
+                Log.d(TAG, "Disponibilidad eliminada")
+                Result.Success(Unit)
+            }
+        } catch (e: HttpException) {
+            if (e.code() == 404) Result.Error(e, "Availability not found")
+            else Result.Error(e, "Server error. Please try again later")
         } catch (e: Exception) {
             Log.e(TAG, "Error eliminando disponibilidad: ${e.message}", e)
-            Result.Error(e, e.localizedMessage ?: "Error eliminando disponibilidad")
+            Result.Error(e, "Server error. Please try again later")
         }
     }
 
@@ -82,4 +94,5 @@ class AvailabilityRepositoryImpl(
         description = description,
         course = course
     )
+
 }

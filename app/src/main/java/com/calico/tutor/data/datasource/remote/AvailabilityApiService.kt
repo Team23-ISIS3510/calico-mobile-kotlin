@@ -23,7 +23,7 @@ interface AvailabilityApiService {
         @Body request: UpdateAvailabilityRequest
     ): AvailabilityResponse
 
-    // DELETE /availability/delete?eventId=ID
-    @DELETE("availability/delete")
-    suspend fun deleteAvailability(@Query("eventId") id: String): Response<Unit>
+    // DELETE /availability/:availabilityId
+    @DELETE("availability/{availabilityId}")
+    suspend fun deleteAvailability(@Path("availabilityId") id: String): Response<Unit>
 }

@@ -8,7 +8,7 @@ data class AvailabilityResponse(
     @SerializedName("date")      val date: String = "",
     @SerializedName("startTime") val startTime: String = "",
     @SerializedName("endTime")   val endTime: String = "",
-    @SerializedName("location")  val location: String = "Online",
+    @SerializedName("location")  val location: String? = null,
     @SerializedName("description") val description: String? = null,
     @SerializedName("course")    val course: String? = null
 )

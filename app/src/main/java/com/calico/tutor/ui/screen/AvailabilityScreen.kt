@@ -5,9 +5,12 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +46,14 @@ import com.calico.tutor.ui.viewmodel.AvailabilityViewModel
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
+
+private val TIME_SLOTS_24H = (7..20).map { h -> String.format("%02d:00", h) }
+
+private fun to12h(time24: String): String = try {
+    SimpleDateFormat("h:mm a", Locale.US)
+        .format(SimpleDateFormat("HH:mm", Locale.US).parse(time24)!!)
+} catch (e: Exception) { time24 }
 
 enum class RepeatOption(val label: String) {
     NONE("Does not repeat"),
@@ -66,15 +78,16 @@ fun AvailabilityScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var createStep by remember { mutableStateOf(0) }
     var selectedDate by remember { mutableStateOf("") }
-    var selectedStartTime by remember { mutableStateOf("") }
-    var selectedEndTime by remember { mutableStateOf("") }
+    var selectedStartTime by remember { mutableStateOf(TIME_SLOTS_24H[0]) }
+    var selectedEndTime by remember { mutableStateOf(TIME_SLOTS_24H[1]) }
+    var title by remember { mutableStateOf("") }
     var repeatOption by remember { mutableStateOf(RepeatOption.NONE) }
     var showRepeatSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(actionState) {
         when (val s = actionState) {
             is AvailabilityActionState.Error -> {
-                Toast.makeText(context, s.message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
                 vm.resetActionState()
             }
             is AvailabilityActionState.Done -> {
@@ -82,8 +95,9 @@ fun AvailabilityScreen(
                 selectedTab = 0
                 createStep = 0
                 selectedDate = ""
-                selectedStartTime = ""
-                selectedEndTime = ""
+                selectedStartTime = TIME_SLOTS_24H[0]
+                selectedEndTime = TIME_SLOTS_24H[1]
+                title = ""
                 repeatOption = RepeatOption.NONE
             }
             else -> {}
@@ -92,12 +106,8 @@ fun AvailabilityScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Column(modifier = Modifier.fillMaxSize()) {
-
-            // Logo header
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -107,69 +117,63 @@ fun AvailabilityScreen(
                 )
             }
 
-            // Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                 AvailabilityTabItem(
                     text = "See availabilities",
                     isSelected = selectedTab == 0,
-                    onClick = { selectedTab = 0 }
+                    onClick = { selectedTab = 0 },
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(28.dp))
                 AvailabilityTabItem(
                     text = "Availability",
                     isSelected = selectedTab == 1,
-                    onClick = { selectedTab = 1; createStep = 0 }
+                    onClick = { selectedTab = 1; createStep = 0 },
+                    modifier = Modifier.weight(1f)
                 )
             }
 
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
 
-            // Content
             when (selectedTab) {
                 0 -> SeeAvailabilitiesTab(listState, vm, onNavigateToEdit)
                 1 -> when (createStep) {
                     0 -> CalendarStep(
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onCreateEvent = {
-                            if (selectedDate.isNotBlank()) createStep = 1
-                            else Toast.makeText(context, "Selecciona una fecha primero", Toast.LENGTH_SHORT).show()
+                        onNext = {
+                            if (selectedDate.isBlank()) {
+                                Toast.makeText(context, "Please select a date first", Toast.LENGTH_SHORT).show()
+                            } else {
+                                createStep = 1
+                            }
                         }
                     )
-                    1 -> TimeRepeatStep(
+                    1 -> TimeStep(
+                        title = title,
                         selectedStartTime = selectedStartTime,
                         selectedEndTime = selectedEndTime,
                         repeatOption = repeatOption,
                         isLoading = actionState is AvailabilityActionState.Loading,
+                        onTitleChange = { title = it },
                         onStartTimeSelected = { selectedStartTime = it },
                         onEndTimeSelected = { selectedEndTime = it },
                         onRepeatClick = { showRepeatSheet = true },
                         onBack = { createStep = 0 },
                         onSave = {
-                            if (selectedStartTime.isBlank() || selectedEndTime.isBlank()) {
-                                Toast.makeText(context, "Selecciona hora de inicio y fin", Toast.LENGTH_SHORT).show()
-                                return@TimeRepeatStep
-                            }
-                            if (selectedStartTime >= selectedEndTime) {
-                                Toast.makeText(context, "La hora de inicio debe ser antes que la de fin", Toast.LENGTH_SHORT).show()
-                                return@TimeRepeatStep
+                            val effectiveTitle = title.trim().ifBlank { "Free" }
+                            val err = validateAvailability(effectiveTitle, selectedDate, selectedStartTime, selectedEndTime)
+                            if (err != null) {
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                                return@TimeStep
                             }
                             vm.createBatch(
                                 getRepeatDates(selectedDate, repeatOption).map { date ->
                                     CreateAvailabilityRequest(
                                         tutorId = tutorId,
-                                        title = "Disponibilidad",
+                                        title = effectiveTitle,
                                         date = date,
                                         startTime = selectedStartTime,
-                                        endTime = selectedEndTime,
-                                        location = "Online",
-                                        description = "",
-                                        course = ""
+                                        endTime = selectedEndTime
                                     )
                                 }
                             )
@@ -181,13 +185,9 @@ fun AvailabilityScreen(
 
         if (actionState is AvailabilityActionState.Loading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = PrimaryOrange)
-            }
+            ) { CircularProgressIndicator(color = PrimaryOrange) }
         }
     }
 
@@ -200,12 +200,25 @@ fun AvailabilityScreen(
     }
 }
 
-// ── Tab label with orange underline ─────────────────────────────────────────
+private fun validateAvailability(title: String, date: String, start: String, end: String): String? {
+    if (title.length > 50) return "Title must be 50 characters or less"
+    val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val today = fmt.format(Date())
+    if (date <= today) return "You cannot set availability for today. Please select a future date"
+    if (start >= end) return "Start time must be before end time"
+    if (start < "07:00" || end > "20:00") return "Time must be between 7:00 AM and 8:00 PM"
+    return null
+}
 
 @Composable
-private fun AvailabilityTabItem(text: String, isSelected: Boolean, onClick: () -> Unit) {
+private fun AvailabilityTabItem(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -213,22 +226,17 @@ private fun AvailabilityTabItem(text: String, isSelected: Boolean, onClick: () -
             color = if (isSelected) PrimaryOrange else MediumGray,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             fontSize = 14.sp,
-            modifier = Modifier.padding(bottom = 6.dp)
+            modifier = Modifier.padding(vertical = 8.dp),
+            textAlign = TextAlign.Center
         )
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .height(2.dp)
-                    .fillMaxWidth()
-                    .background(PrimaryOrange, RoundedCornerShape(1.dp))
-            )
-        } else {
-            Spacer(modifier = Modifier.height(2.dp))
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(if (isSelected) PrimaryOrange else Color.Transparent, RoundedCornerShape(1.dp))
+        )
     }
 }
-
-// ── "See availabilities" tab content ────────────────────────────────────────
 
 @Composable
 private fun SeeAvailabilitiesTab(
@@ -237,197 +245,128 @@ private fun SeeAvailabilitiesTab(
     onNavigateToEdit: (AvailabilityItem) -> Unit
 ) {
     when (listState) {
-        is AvailabilityListState.Loading -> Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) { CircularProgressIndicator(color = PrimaryOrange) }
-
+        is AvailabilityListState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+            CircularProgressIndicator(color = PrimaryOrange)
+        }
         is AvailabilityListState.Error -> Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(listState.message, color = Color.Red, fontSize = 14.sp, textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { vm.load() },
+            Text(listState.message, color = Color.Red, fontSize = 14.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = { vm.load() },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
-            ) { Text("Reintentar") }
+            ) { Text("Retry") }
         }
-
         is AvailabilityListState.Success -> {
             val grouped = groupByDay(listState.items)
             if (grouped.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No tienes disponibilidades registradas",
-                        color = MediumGray,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(32.dp)
-                    )
+                Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    Text("No upcoming availabilities", color = MediumGray, fontSize = 14.sp,
+                        textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
                 ) {
                     grouped.forEach { (label, dayItems) ->
                         item {
-                            Text(
-                                text = label,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = MediumGray,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                            Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(dayItems) { item ->
-                            AvailabilityCard(
-                                item = item,
-                                onEdit = { onNavigateToEdit(item) },
-                                onDelete = { vm.delete(item.id) }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.delete(item.id) })
+                            Spacer(Modifier.height(8.dp))
                         }
                     }
                 }
             }
         }
-
         else -> {}
     }
 }
-
-// ── Step 1: Calendar ─────────────────────────────────────────────────────────
 
 @Composable
 private fun CalendarStep(
     selectedDate: String,
     onDateSelected: (String) -> Unit,
-    onCreateEvent: () -> Unit
+    onNext: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Spacer(Modifier.height(16.dp))
         Text("Select a date", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CalendarView(selectedDate = selectedDate, onDateSelected = onDateSelected)
-
-        Spacer(modifier = Modifier.weight(1f))
-
+        Spacer(Modifier.height(16.dp))
+        CalendarView(selectedDate, onDateSelected)
+        Spacer(Modifier.weight(1f))
         Button(
-            onClick = onCreateEvent,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
+            onClick = onNext,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(28.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
-        ) {
-            Text("Create event", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-        Spacer(modifier = Modifier.height(24.dp))
+        ) { Text("Create event", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
 private fun CalendarView(selectedDate: String, onDateSelected: (String) -> Unit) {
     val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val today = dateFmt.format(Date())
     val now = Calendar.getInstance()
-
+    val minCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+    val minDate = dateFmt.format(minCal.time)
     var displayYear by remember { mutableStateOf(now.get(Calendar.YEAR)) }
     var displayMonth by remember { mutableStateOf(now.get(Calendar.MONTH)) }
-
-    val monthNames = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    )
-
+    val monthNames = listOf("January","February","March","April","May","June",
+        "July","August","September","October","November","December")
     val firstDayCal = Calendar.getInstance().apply {
-        set(Calendar.YEAR, displayYear)
-        set(Calendar.MONTH, displayMonth)
-        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.YEAR, displayYear); set(Calendar.MONTH, displayMonth); set(Calendar.DAY_OF_MONTH, 1)
     }
     val firstDayOfWeek = firstDayCal.get(Calendar.DAY_OF_WEEK) - 1
     val daysInMonth = firstDayCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-
     Column {
-        // Month navigation
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
             IconButton(onClick = {
                 if (displayMonth == 0) { displayMonth = 11; displayYear-- } else displayMonth--
-            }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Anterior", tint = Color.Black)
-            }
-            Text(
-                text = "${monthNames[displayMonth]} $displayYear",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
-            )
+            }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Prev", tint = Color.Black) }
+            Text("${monthNames[displayMonth]} $displayYear", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             IconButton(onClick = {
                 if (displayMonth == 11) { displayMonth = 0; displayYear++ } else displayMonth++
-            }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Siguiente", tint = Color.Black)
+            }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Next", tint = Color.Black) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            listOf("S","M","T","W","T","F","S").forEach { d ->
+                Text(d, Modifier.weight(1f), textAlign = TextAlign.Center,
+                    color = MediumGray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Day headers
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("S", "M", "T", "W", "T", "F", "S").forEach { d ->
-                Text(
-                    text = d,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    color = MediumGray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Day cells
+        Spacer(Modifier.height(8.dp))
         val rows = ((firstDayOfWeek + daysInMonth) + 6) / 7
         for (row in 0 until rows) {
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth()) {
                 for (col in 0..6) {
                     val day = row * 7 + col - firstDayOfWeek + 1
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(Modifier.weight(1f).aspectRatio(1f), Alignment.Center) {
                         if (day in 1..daysInMonth) {
                             val dateStr = String.format("%d-%02d-%02d", displayYear, displayMonth + 1, day)
                             val isSelected = dateStr == selectedDate
-                            val isToday = dateStr == today
-
+                            val isToday = dateStr == dateFmt.format(Date())
+                            val isPast = dateStr < minDate
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(if (isSelected) PrimaryOrange else Color.Transparent)
-                                    .clickable { onDateSelected(dateStr) },
+                                    .clickable(enabled = !isPast) { onDateSelected(dateStr) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = day.toString(),
+                                    day.toString(),
                                     color = when {
+                                        isPast -> Color(0xFFCCCCCC)
                                         isSelected -> Color.White
                                         isToday -> PrimaryOrange
                                         else -> Color.Black
@@ -444,20 +383,14 @@ private fun CalendarView(selectedDate: String, onDateSelected: (String) -> Unit)
     }
 }
 
-// ── Step 2: Time + Repeat + Save ─────────────────────────────────────────────
-
-private val AVAILABILITY_TIME_SLOTS = listOf(
-    "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
-    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00",
-    "19:00", "20:00", "21:00"
-)
-
 @Composable
-private fun TimeRepeatStep(
+private fun TimeStep(
+    title: String,
     selectedStartTime: String,
     selectedEndTime: String,
     repeatOption: RepeatOption,
     isLoading: Boolean,
+    onTitleChange: (String) -> Unit,
     onStartTimeSelected: (String) -> Unit,
     onEndTimeSelected: (String) -> Unit,
     onRepeatClick: () -> Unit,
@@ -465,127 +398,127 @@ private fun TimeRepeatStep(
     onSave: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Top bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.Black)
-            }
-            Text(
-                text = "Select days",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.size(48.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.Black) }
+            Text("Select time", fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Spacer(Modifier.size(48.dp))
         }
-
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Select a time", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Two-column time grid
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.weight(1f)) {
-                    AVAILABILITY_TIME_SLOTS.forEach { slot ->
-                        TimeSlotCell(
-                            time = slot,
-                            isSelected = slot == selectedStartTime,
-                            endPadding = true,
-                            onClick = { onStartTimeSelected(slot) }
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    AVAILABILITY_TIME_SLOTS.forEach { slot ->
-                        TimeSlotCell(
-                            time = slot,
-                            isSelected = slot == selectedEndTime,
-                            endPadding = false,
-                            onClick = { onEndTimeSelected(slot) }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Repeat button
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = title,
+                onValueChange = { if (it.length <= 50) onTitleChange(it) },
+                placeholder = { Text("Title (optional)", color = MediumGray, fontSize = 14.sp) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(0.7f).align(Alignment.CenterHorizontally),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryOrange,
+                    unfocusedBorderColor = Color(0xFFDDDDDD)
+                )
+            )
+            Spacer(Modifier.height(20.dp))
+            Text("Start time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
+            Spacer(Modifier.height(8.dp))
+            WheelTimePicker(TIME_SLOTS_24H, selectedStartTime, onStartTimeSelected, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(20.dp))
+            Text("End time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
+            Spacer(Modifier.height(8.dp))
+            WheelTimePicker(TIME_SLOTS_24H, selectedEndTime, onEndTimeSelected, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(20.dp))
             OutlinedButton(
                 onClick = onRepeatClick,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(20.dp)
             ) {
-                Text(text = repeatOption.label, color = Color.Black, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(18.dp)
-                )
+                Text(repeatOption.label, color = Color.Black, fontSize = 14.sp)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.Black, modifier = Modifier.size(18.dp))
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
+            Spacer(Modifier.height(24.dp))
             Button(
                 onClick = onSave,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange),
                 enabled = !isLoading
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-                } else {
-                    Text("Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
+                if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                else Text("Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun TimeSlotCell(time: String, isSelected: Boolean, endPadding: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                end = if (endPadding) 6.dp else 0.dp,
-                start = if (endPadding) 0.dp else 6.dp,
-                bottom = 8.dp
-            )
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) PrimaryOrange else Color(0xFFF5F5F5))
-            .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = formatTime24to12(time),
-            fontSize = 13.sp,
-            color = if (isSelected) Color.White else Color.Black,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+internal fun WheelTimePicker(
+    slots: List<String>,
+    selectedTime: String,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val itemHeightDp = 48.dp
+    val visibleCount = 5
+    val initialIndex = slots.indexOf(selectedTime).coerceAtLeast(0)
+    val lazyState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = lazyState)
+
+    val centerIndex by remember {
+        derivedStateOf {
+            val info = lazyState.layoutInfo
+            val vpCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
+            info.visibleItemsInfo
+                .minByOrNull { abs(it.offset + it.size / 2 - vpCenter) }
+                ?.index ?: initialIndex
+        }
+    }
+
+    LaunchedEffect(lazyState.isScrollInProgress) {
+        if (!lazyState.isScrollInProgress && centerIndex in slots.indices) {
+            onSelected(slots[centerIndex])
+        }
+    }
+
+    Box(modifier = modifier.height(itemHeightDp * visibleCount)) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(itemHeightDp)
+                .background(Color(0xFFF2F2F2), RoundedCornerShape(10.dp))
+        )
+        LazyColumn(
+            state = lazyState,
+            flingBehavior = flingBehavior,
+            contentPadding = PaddingValues(vertical = itemHeightDp * (visibleCount / 2)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            itemsIndexed(slots) { index, slot ->
+                val isCenter = index == centerIndex
+                Box(Modifier.height(itemHeightDp).fillMaxWidth(), Alignment.Center) {
+                    Text(
+                        text = to12h(slot),
+                        fontSize = if (isCenter) 20.sp else 15.sp,
+                        color = if (isCenter) Color.Black else Color(0xFFBBBBBB),
+                        fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier.fillMaxWidth().height(itemHeightDp * 2).align(Alignment.TopCenter)
+                .background(Brush.verticalGradient(listOf(Color.White, Color.Transparent)))
+        )
+        Box(
+            modifier = Modifier.fillMaxWidth().height(itemHeightDp * 2).align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.White)))
         )
     }
 }
-
-// ── Repeat bottom sheet ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -599,33 +532,17 @@ private fun RepeatBottomSheet(
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 40.dp)
-        ) {
-            Text(
-                text = "Repeat",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 40.dp)) {
+            Text("Repeat", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 12.dp))
             RepeatOption.entries.forEach { option ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelect(option) }
-                        .padding(vertical = 14.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(option) }.padding(vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = option.label, fontSize = 14.sp, color = Color.Black)
-                    RadioButton(
-                        selected = option == currentOption,
-                        onClick = { onSelect(option) },
-                        colors = RadioButtonDefaults.colors(selectedColor = PrimaryOrange)
-                    )
+                    Text(option.label, fontSize = 14.sp, color = Color.Black)
+                    RadioButton(selected = option == currentOption, onClick = { onSelect(option) },
+                        colors = RadioButtonDefaults.colors(selectedColor = PrimaryOrange))
                 }
                 HorizontalDivider(color = Color(0xFFEEEEEE))
             }
@@ -633,95 +550,61 @@ private fun RepeatBottomSheet(
     }
 }
 
-// ── Availability card (list view) ─────────────────────────────────────────────
-
 @Composable
 private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelete: () -> Unit) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
-    if (showDeleteDialog) {
+    var showDialog by remember { mutableStateOf(false) }
+    if (showDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Eliminar disponibilidad") },
-            text = { Text("¿Deseas eliminar \"${item.title}\"?") },
+            onDismissRequest = { showDialog = false },
+            title = { Text("Delete availability") },
+            text = { Text("Delete \"${item.title}\"?") },
             confirmButton = {
-                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
-                    Text("Eliminar", color = Color.Red)
-                }
+                TextButton(onClick = { showDialog = false; onDelete() }) { Text("Delete", color = Color.Red) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showDialog = false }) { Text("Cancel") }
             }
         )
     }
-
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 2.dp),
+        modifier = Modifier.fillMaxWidth().shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text(item.title, fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "${formatTime24to12(item.startTime)} – ${formatTime24to12(item.endTime)}",
-                    color = PrimaryOrange,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (!item.course.isNullOrBlank()) Text(item.course, color = MediumGray, fontSize = 12.sp)
-                if (!item.description.isNullOrBlank()) Text(item.description, color = MediumGray, fontSize = 12.sp)
-                Text(item.location, color = MediumGray, fontSize = 12.sp)
+                Spacer(Modifier.height(2.dp))
+                Text(item.date, color = MediumGray, fontSize = 12.sp)
+                Spacer(Modifier.height(2.dp))
+                Text("${to12h(item.startTime)} – ${to12h(item.endTime)}",
+                    color = PrimaryOrange, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
             Column {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, "Editar", tint = PrimaryOrange)
-                }
-                IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(Icons.Default.Delete, "Eliminar", tint = Color(0xFFE53935))
-                }
+                IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit", tint = PrimaryOrange) }
+                IconButton(onClick = { showDialog = true }) { Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFE53935)) }
             }
         }
     }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
 private fun groupByDay(items: List<AvailabilityItem>): LinkedHashMap<String, List<AvailabilityItem>> {
     val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val displayFmt = SimpleDateFormat("EEE, d MMM", Locale.ENGLISH)
     val today = dateFmt.format(Date())
-    val tomorrowCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
-    val tomorrow = dateFmt.format(tomorrowCal.time)
-    val displayFmt = SimpleDateFormat("EEE, d MMM", Locale("es"))
+    val tomorrow = dateFmt.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time)
     val sorted = items.sortedWith(compareBy({ it.date }, { it.startTime }))
     val map = LinkedHashMap<String, MutableList<AvailabilityItem>>()
     for (item in sorted) {
         val label = when (item.date) {
-            today -> "HOY"
-            tomorrow -> "MAÑANA"
-            else -> try {
-                dateFmt.parse(item.date)?.let { displayFmt.format(it).uppercase(Locale.getDefault()) } ?: item.date
-            } catch (e: Exception) { item.date }
+            today -> "TODAY"; tomorrow -> "TOMORROW"
+            else -> try { dateFmt.parse(item.date)?.let { displayFmt.format(it).uppercase() } ?: item.date }
+                    catch (e: Exception) { item.date }
         }
         map.getOrPut(label) { mutableListOf() }.add(item)
     }
     @Suppress("UNCHECKED_CAST")
     return map as LinkedHashMap<String, List<AvailabilityItem>>
-}
-
-private fun formatTime24to12(time: String): String {
-    return try {
-        val sdf12 = SimpleDateFormat("h:mm a", Locale.getDefault())
-        sdf12.format(SimpleDateFormat("HH:mm", Locale.getDefault()).parse(time)!!)
-    } catch (e: Exception) { time }
 }
 
 private fun getRepeatDates(baseDate: String, option: RepeatOption): List<String> {
