@@ -102,19 +102,23 @@ class AvailabilityViewModel(
     }
 
     fun delete(id: String) {
+        // Optimistic removal so the UI reacts instantly
+        val currentItems = (_listState.value as? AvailabilityListState.Success)?.items ?: emptyList()
+        _listState.value = AvailabilityListState.Success(currentItems.filter { it.id != id })
+
         viewModelScope.launch {
-            _actionState.value = AvailabilityActionState.Loading
             when (val result = repository.deleteAvailability(id)) {
                 is Result.Success -> {
                     Log.d(TAG, "Eliminada disponibilidad: $id")
-                    _actionState.value = AvailabilityActionState.Done
-                    load()
+                    load() // sync list from server
                 }
                 is Result.Error -> {
                     Log.e(TAG, "Error eliminando: ${result.message}")
-                    _actionState.value = AvailabilityActionState.Error(result.message ?: "Error eliminando disponibilidad")
+                    // Restore list and notify error
+                    _listState.value = AvailabilityListState.Success(currentItems)
+                    _actionState.value = AvailabilityActionState.Error(result.message ?: "Error deleting availability")
                 }
-                is Result.Loading -> _actionState.value = AvailabilityActionState.Loading
+                is Result.Loading -> {}
             }
         }
     }

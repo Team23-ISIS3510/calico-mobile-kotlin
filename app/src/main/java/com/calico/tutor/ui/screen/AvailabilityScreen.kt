@@ -48,7 +48,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 
-private val TIME_SLOTS_24H = (7..20).map { h -> String.format("%02d:00", h) }
+private val START_TIME_SLOTS = (7..19).map { h -> String.format("%02d:00", h) }
+private val END_TIME_SLOTS   = (8..20).map { h -> String.format("%02d:00", h) }
 
 private fun to12h(time24: String): String = try {
     SimpleDateFormat("h:mm a", Locale.US)
@@ -78,8 +79,8 @@ fun AvailabilityScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var createStep by remember { mutableStateOf(0) }
     var selectedDate by remember { mutableStateOf("") }
-    var selectedStartTime by remember { mutableStateOf(TIME_SLOTS_24H[0]) }
-    var selectedEndTime by remember { mutableStateOf(TIME_SLOTS_24H[1]) }
+    var selectedStartTime by remember { mutableStateOf(START_TIME_SLOTS[0]) }
+    var selectedEndTime by remember { mutableStateOf(END_TIME_SLOTS[1]) }
     var title by remember { mutableStateOf("") }
     var repeatOption by remember { mutableStateOf(RepeatOption.NONE) }
     var showRepeatSheet by remember { mutableStateOf(false) }
@@ -95,8 +96,8 @@ fun AvailabilityScreen(
                 selectedTab = 0
                 createStep = 0
                 selectedDate = ""
-                selectedStartTime = TIME_SLOTS_24H[0]
-                selectedEndTime = TIME_SLOTS_24H[1]
+                selectedStartTime = START_TIME_SLOTS[0]
+                selectedEndTime = END_TIME_SLOTS[1]
                 title = ""
                 repeatOption = RepeatOption.NONE
             }
@@ -206,7 +207,8 @@ private fun validateAvailability(title: String, date: String, start: String, end
     val today = fmt.format(Date())
     if (date <= today) return "You cannot set availability for today. Please select a future date"
     if (start >= end) return "Start time must be before end time"
-    if (start < "07:00" || end > "20:00") return "Time must be between 7:00 AM and 8:00 PM"
+    if (start > "19:00") return "Start time must be 7:00 PM or earlier"
+    if (end < "08:00") return "End time must be 8:00 AM or later"
     return null
 }
 
@@ -423,11 +425,11 @@ private fun TimeStep(
             Spacer(Modifier.height(20.dp))
             Text("Start time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
             Spacer(Modifier.height(8.dp))
-            WheelTimePicker(TIME_SLOTS_24H, selectedStartTime, onStartTimeSelected, Modifier.fillMaxWidth())
+            WheelTimePicker(START_TIME_SLOTS, selectedStartTime, onStartTimeSelected, Modifier.fillMaxWidth())
             Spacer(Modifier.height(20.dp))
             Text("End time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
             Spacer(Modifier.height(8.dp))
-            WheelTimePicker(TIME_SLOTS_24H, selectedEndTime, onEndTimeSelected, Modifier.fillMaxWidth())
+            WheelTimePicker(END_TIME_SLOTS, selectedEndTime, onEndTimeSelected, Modifier.fillMaxWidth())
             Spacer(Modifier.height(20.dp))
             OutlinedButton(
                 onClick = onRepeatClick,

@@ -43,10 +43,13 @@ class AvailabilityRepositoryImpl(
 
     override suspend fun createAvailability(request: CreateAvailabilityRequest): Result<AvailabilityItem> {
         return try {
-            Log.d(TAG, "Creando disponibilidad: ${request.date} ${request.startTime}-${request.endTime}")
+            Log.d(TAG, "POST /availability/create → ${request.date} ${request.startTime}-${request.endTime}")
             val response = apiService.createAvailability(request)
-            Log.d(TAG, "Disponibilidad creada con id: ${response.id}")
+            Log.d(TAG, "Creada con id: ${response.id}")
             Result.Success(response.toModel())
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP ${e.code()} al crear disponibilidad: ${e.message()}")
+            Result.Error(e, "Server error (${e.code()}). Please try again later")
         } catch (e: Exception) {
             Log.e(TAG, "Error creando disponibilidad: ${e.message}", e)
             Result.Error(e, "Server error. Please try again later")
@@ -55,10 +58,13 @@ class AvailabilityRepositoryImpl(
 
     override suspend fun updateAvailability(id: String, request: UpdateAvailabilityRequest): Result<AvailabilityItem> {
         return try {
-            Log.d(TAG, "Actualizando disponibilidad id: $id")
+            Log.d(TAG, "PUT /availability/$id")
             val response = apiService.updateAvailability(id, request)
-            Log.d(TAG, "Disponibilidad actualizada")
+            Log.d(TAG, "Actualizada disponibilidad: $id")
             Result.Success(response.toModel())
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP ${e.code()} al actualizar disponibilidad: ${e.message()}")
+            Result.Error(e, "Server error (${e.code()}). Please try again later")
         } catch (e: Exception) {
             Log.e(TAG, "Error actualizando disponibilidad: ${e.message}", e)
             Result.Error(e, "Server error. Please try again later")
@@ -67,13 +73,18 @@ class AvailabilityRepositoryImpl(
 
     override suspend fun deleteAvailability(id: String): Result<Unit> {
         return try {
-            Log.d(TAG, "Eliminando disponibilidad id: $id")
+            Log.d(TAG, "DELETE /availability/$id")
             val response = apiService.deleteAvailability(id)
-            if (response.code() == 404) {
-                Result.Error(Exception("404"), "Availability not found")
-            } else {
-                Log.d(TAG, "Disponibilidad eliminada")
-                Result.Success(Unit)
+            when {
+                response.isSuccessful -> {
+                    Log.d(TAG, "Eliminada disponibilidad: $id (${response.code()})")
+                    Result.Success(Unit)
+                }
+                response.code() == 404 -> Result.Error(Exception("404"), "Availability not found")
+                else -> {
+                    Log.e(TAG, "HTTP ${response.code()} al eliminar disponibilidad")
+                    Result.Error(Exception("HTTP ${response.code()}"), "Server error. Please try again later")
+                }
             }
         } catch (e: HttpException) {
             if (e.code() == 404) Result.Error(e, "Availability not found")

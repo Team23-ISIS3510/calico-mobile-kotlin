@@ -33,7 +33,8 @@ import com.calico.tutor.ui.viewmodel.AvailabilityViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val EDIT_TIME_SLOTS = (7..20).map { h -> String.format("%02d:00", h) }
+private val EDIT_START_SLOTS = (7..19).map { h -> String.format("%02d:00", h) }
+private val EDIT_END_SLOTS   = (8..20).map { h -> String.format("%02d:00", h) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,14 +61,14 @@ fun CreateAvailabilityScreen(
     }
     var startTime by remember {
         mutableStateOf(
-            editingItem?.startTime?.let { if (it in EDIT_TIME_SLOTS) it else EDIT_TIME_SLOTS[0] }
-                ?: EDIT_TIME_SLOTS[0]
+            editingItem?.startTime?.let { if (it in EDIT_START_SLOTS) it else EDIT_START_SLOTS[0] }
+                ?: EDIT_START_SLOTS[0]
         )
     }
     var endTime by remember {
         mutableStateOf(
-            editingItem?.endTime?.let { if (it in EDIT_TIME_SLOTS) it else EDIT_TIME_SLOTS[1] }
-                ?: EDIT_TIME_SLOTS[1]
+            editingItem?.endTime?.let { if (it in EDIT_END_SLOTS) it else EDIT_END_SLOTS[1] }
+                ?: EDIT_END_SLOTS[1]
         )
     }
 
@@ -91,6 +92,7 @@ fun CreateAvailabilityScreen(
         "July","August","September","October","November","December")
 
     Scaffold(
+        containerColor = Color.White,
         topBar = {
             TopAppBar(
                 title = { Text("Edit availability", fontWeight = FontWeight.Bold) },
@@ -193,12 +195,12 @@ fun CreateAvailabilityScreen(
             Spacer(Modifier.height(24.dp))
             Text("Start time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
             Spacer(Modifier.height(8.dp))
-            WheelTimePicker(EDIT_TIME_SLOTS, startTime, { startTime = it }, Modifier.fillMaxWidth())
+            WheelTimePicker(EDIT_START_SLOTS, startTime, { startTime = it }, Modifier.fillMaxWidth())
 
             Spacer(Modifier.height(20.dp))
             Text("End time", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
             Spacer(Modifier.height(8.dp))
-            WheelTimePicker(EDIT_TIME_SLOTS, endTime, { endTime = it }, Modifier.fillMaxWidth())
+            WheelTimePicker(EDIT_END_SLOTS, endTime, { endTime = it }, Modifier.fillMaxWidth())
 
             Spacer(Modifier.height(28.dp))
 
@@ -215,8 +217,11 @@ fun CreateAvailabilityScreen(
                     if (startTime >= endTime) {
                         Toast.makeText(context, "Start time must be before end time", Toast.LENGTH_LONG).show(); return@Button
                     }
-                    if (startTime < "07:00" || endTime > "20:00") {
-                        Toast.makeText(context, "Time must be between 7:00 AM and 8:00 PM", Toast.LENGTH_LONG).show(); return@Button
+                    if (startTime > "19:00") {
+                        Toast.makeText(context, "Start time must be 7:00 PM or earlier", Toast.LENGTH_LONG).show(); return@Button
+                    }
+                    if (endTime < "08:00") {
+                        Toast.makeText(context, "End time must be 8:00 AM or later", Toast.LENGTH_LONG).show(); return@Button
                     }
                     if (editingItem != null) {
                         vm.update(
