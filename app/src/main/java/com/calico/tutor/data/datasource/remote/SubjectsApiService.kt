@@ -20,6 +20,7 @@ import retrofit2.http.Query
 
 interface SubjectsApiService {
     @GET("subjects/history")
+    
     suspend fun getSubjectsHistory(): SubjectsHistoryResponse
 
     @GET("subjects/history/tutor/{tutorId}")
