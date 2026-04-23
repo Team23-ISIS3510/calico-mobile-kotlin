@@ -1,7 +1,7 @@
 package com.calico.tutor.domain.model
 
 data class AvailabilityItem(
-    val id: Int,
+    val id: String,
     val title: String,
     val date: String,
     val startTime: String,

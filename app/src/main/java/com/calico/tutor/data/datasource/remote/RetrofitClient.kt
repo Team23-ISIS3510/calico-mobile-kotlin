@@ -32,6 +32,14 @@ object RetrofitClient {
         return retrofit.create(AvailabilityApiService::class.java)
     }
 
+    fun createAnalyticsApiService(retrofit: Retrofit): AnalyticsApiService {
+        return retrofit.create(AnalyticsApiService::class.java)
+    }
+
+    fun createTelemetryApiService(retrofit: Retrofit): TelemetryApiService {
+        return retrofit.create(TelemetryApiService::class.java)
+    }
+
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {
         return createHttpClient(tokenManager)
     }

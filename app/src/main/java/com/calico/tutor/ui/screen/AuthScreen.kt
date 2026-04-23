@@ -25,7 +25,6 @@ private const val TAG = "AuthScreen"
 fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.activity.ComponentActivity) {
     val authState = viewModel.authState.collectAsState()
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
-    val (currentScreen, setCurrentScreen) = remember { mutableStateOf("home") }
     val (errorToShow, setErrorToShow) = remember { mutableStateOf<String?>(null) }
     val (isGoogleLoading, setGoogleLoading) = remember { mutableStateOf(false) }
 
@@ -129,23 +128,13 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                 .substringBefore("@")
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 
-            when (currentScreen) {
-                "topSubjects" -> {
-                    TopSubjectsScreen(
-                        context = context,
-                        onNavigateBack = { setCurrentScreen("home") }
-                    )
-                }
-                else -> {
-                    HomeScreen(
-                        userName = userName,
-                        tutorId = email,
-                        context = context,
-                        onLogout = { viewModel.resetState() },
-                        onNavigateToTopSubjects = { setCurrentScreen("topSubjects") }
-                    )
-                }
-            }
+            MainScreen(
+                userName = userName,
+                tutorId = email,
+                userEmail = email,
+                context = context,
+                onLogout = { viewModel.resetState() }
+            )
         }
         else -> {
             if (showLogin) {

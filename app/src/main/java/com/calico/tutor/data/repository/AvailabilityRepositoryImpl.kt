@@ -7,6 +7,7 @@ import com.calico.tutor.data.dto.request.UpdateAvailabilityRequest
 import com.calico.tutor.domain.model.AvailabilityItem
 import com.calico.tutor.domain.repository.AvailabilityRepository
 import com.calico.tutor.domain.utils.Result
+import retrofit2.HttpException
 
 private const val TAG = "AvailabilityRepo"
 
@@ -18,9 +19,17 @@ class AvailabilityRepositoryImpl(
         return try {
             Log.d(TAG, "Cargando disponibilidades para tutor: $tutorId")
             val response = apiService.getAvailabilities(tutorId)
-            val items = response.map { it.toModel() }
+            val items = response.getList().map { it.toModel() }
             Log.d(TAG, "Disponibilidades cargadas: ${items.size}")
             Result.Success(items)
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                Log.d(TAG, "No hay disponibilidades registradas para: $tutorId")
+                Result.Success(emptyList())
+            } else {
+                Log.e(TAG, "HTTP ${e.code()} cargando disponibilidades: ${e.message()}", e)
+                Result.Error(e, "Error del servidor (${e.code()})")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error cargando disponibilidades: ${e.message}", e)
             Result.Error(e, e.localizedMessage ?: "Error cargando disponibilidades")
@@ -39,7 +48,7 @@ class AvailabilityRepositoryImpl(
         }
     }
 
-    override suspend fun updateAvailability(id: Int, request: UpdateAvailabilityRequest): Result<AvailabilityItem> {
+    override suspend fun updateAvailability(id: String, request: UpdateAvailabilityRequest): Result<AvailabilityItem> {
         return try {
             Log.d(TAG, "Actualizando disponibilidad id: $id")
             val response = apiService.updateAvailability(id, request)
@@ -51,7 +60,7 @@ class AvailabilityRepositoryImpl(
         }
     }
 
-    override suspend fun deleteAvailability(id: Int): Result<Unit> {
+    override suspend fun deleteAvailability(id: String): Result<Unit> {
         return try {
             Log.d(TAG, "Eliminando disponibilidad id: $id")
             apiService.deleteAvailability(id)

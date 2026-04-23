@@ -2,10 +2,13 @@ package com.calico.tutor.di
 
 import android.content.Context
 import com.calico.tutor.data.datasource.local.TokenManager
+import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.AvailabilityApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
+import com.calico.tutor.data.datasource.remote.TelemetryApiService
+import com.calico.tutor.data.repository.TelemetryRepository
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
 import com.calico.tutor.data.repository.AvailabilityRepositoryImpl
@@ -28,11 +31,17 @@ object ServiceLocator {
     @Volatile
     private var availabilityApiService: AvailabilityApiService? = null
     @Volatile
+    private var _analyticsApiService: AnalyticsApiService? = null
+    @Volatile
+    private var _telemetryApiService: TelemetryApiService? = null
+    @Volatile
     private var authRepository: AuthRepository? = null
     @Volatile
     private var analyticsRepository: AnalyticsRepository? = null
     @Volatile
     private var availabilityRepository: AvailabilityRepository? = null
+    @Volatile
+    private var _telemetryRepository: TelemetryRepository? = null
 
     private fun getTokenManager(context: Context): TokenManager {
         return _tokenManager ?: synchronized(this) {
@@ -107,6 +116,29 @@ object ServiceLocator {
 
     fun clearTokenUseCase(context: Context): ClearTokenUseCase =
         ClearTokenUseCase(authRepository(context))
+
+    fun analyticsApiService(context: Context): AnalyticsApiService {
+        return _analyticsApiService ?: synchronized(this) {
+            _analyticsApiService ?: RetrofitClient.createAnalyticsApiService(
+                RetrofitClient.createRetrofit(
+                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                )
+            ).also { _analyticsApiService = it }
+        }
+    }
+
+    fun telemetryRepository(context: Context): TelemetryRepository {
+        return _telemetryRepository ?: synchronized(this) {
+            _telemetryRepository ?: TelemetryRepository(
+                apiService = _telemetryApiService ?: RetrofitClient.createTelemetryApiService(
+                    RetrofitClient.createRetrofit(
+                        RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                    )
+                ).also { _telemetryApiService = it },
+                context = context.applicationContext
+            ).also { _telemetryRepository = it }
+        }
+    }
 
     // Expose TokenManager publicly
     fun provideTokenManager(context: Context): TokenManager =

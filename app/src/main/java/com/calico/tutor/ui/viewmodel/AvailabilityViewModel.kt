@@ -50,6 +50,7 @@ class AvailabilityViewModel(
     fun load() {
         viewModelScope.launch {
             _listState.value = AvailabilityListState.Loading
+            Log.d(TAG, "Cargando disponibilidades para tutorId: $tutorId")
             when (val result = repository.getAvailabilities(tutorId)) {
                 is Result.Success -> {
                     Log.d(TAG, "Cargadas ${result.data.size} disponibilidades")
@@ -82,7 +83,7 @@ class AvailabilityViewModel(
         }
     }
 
-    fun update(id: Int, request: UpdateAvailabilityRequest) {
+    fun update(id: String, request: UpdateAvailabilityRequest) {
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
             when (val result = repository.updateAvailability(id, request)) {
@@ -100,7 +101,7 @@ class AvailabilityViewModel(
         }
     }
 
-    fun delete(id: Int) {
+    fun delete(id: String) {
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
             when (val result = repository.deleteAvailability(id)) {
@@ -115,6 +116,25 @@ class AvailabilityViewModel(
                 }
                 is Result.Loading -> _actionState.value = AvailabilityActionState.Loading
             }
+        }
+    }
+
+    fun createBatch(requests: List<CreateAvailabilityRequest>) {
+        if (requests.isEmpty()) return
+        viewModelScope.launch {
+            _actionState.value = AvailabilityActionState.Loading
+            for (request in requests) {
+                when (val result = repository.createAvailability(request)) {
+                    is Result.Error -> {
+                        Log.e(TAG, "Error en batch: ${result.message}")
+                        _actionState.value = AvailabilityActionState.Error(result.message ?: "Error creando disponibilidad")
+                        return@launch
+                    }
+                    else -> {}
+                }
+            }
+            _actionState.value = AvailabilityActionState.Done
+            load()
         }
     }
 
