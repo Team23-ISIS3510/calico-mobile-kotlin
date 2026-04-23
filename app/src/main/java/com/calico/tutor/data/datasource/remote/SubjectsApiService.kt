@@ -4,7 +4,6 @@ import com.calico.tutor.data.dto.response.SubjectsHistoryResponse
 import com.calico.tutor.data.dto.response.TutorResponse
 import com.calico.tutor.data.dto.response.TutoringSessionsResponse
 import com.calico.tutor.data.dto.response.TutorOccupancyResponse
-import com.calico.tutor.data.dto.response.CourseResponse
 import com.calico.tutor.domain.model.SessionHistory
 import com.calico.tutor.data.dto.AvailabilityResponseDto
 import retrofit2.http.GET
@@ -30,15 +29,6 @@ interface SubjectsApiService {
     @GET("tutoring-sessions/tutor/{tutorId}")
     suspend fun getTutoringSessionsForTutor(@Path("tutorId") tutorId: String): TutoringSessionsResponse
 
-    @GET("tutoring-sessions/tutor/{tutorId}/previous")
-    suspend fun getPreviousSessions(@Path("tutorId") tutorId: String): TutoringSessionsResponse
-
-    @GET("tutoring-sessions/tutor/{tutorId}/upcoming")
-    suspend fun getUpcomingSessions(@Path("tutorId") tutorId: String): TutoringSessionsResponse
-
     @GET("analytics/tutor-occupancy/{tutorId}")
     suspend fun getTutorOccupancy(@Path("tutorId") tutorId: String): TutorOccupancyResponse
-
-    @GET("courses/{courseId}")
-    suspend fun getCourseById(@Path("courseId") courseId: String): CourseResponse
 }

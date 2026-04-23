@@ -1,30 +1,22 @@
 package com.calico.tutor.data.datasource.remote
 
-import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import com.google.gson.GsonBuilder
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-<<<<<<< HEAD
-    private const val BASE_URL = "http://157.253.245.14:3000/"
-=======
-    private const val BASE_URL = "http://10.50.0.251:3000/"
->>>>>>> 9b46475fd1d2470b23d1665fc3193d065caf78c8
+    private const val BASE_URL = "http://192.168.1.31:3000/"
 
     fun createRetrofit(
-        httpClient: OkHttpClient = createHttpClient(null, null)
+        httpClient: OkHttpClient = createHttpClient(null)
     ): Retrofit {
-        val gson = GsonBuilder()
-            .serializeNulls()
-            .create()
-        
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(httpClient)
-            .addConverterFactory(GsonConverterFactory.create(gson))
+            .addConverterFactory(GsonConverterFactory.create(GsonBuilder().serializeNulls().create()))
             .build()
     }
 
@@ -36,29 +28,15 @@ object RetrofitClient {
         return retrofit.create(SubjectsApiService::class.java)
     }
 
-    fun createTelemetryApiService(retrofit: Retrofit): TelemetryApiService {
-        return retrofit.create(TelemetryApiService::class.java)
-    }
-
-    fun createAnalyticsApiService(retrofit: Retrofit): AnalyticsApiService {
-        return retrofit.create(AnalyticsApiService::class.java)
+    fun createAvailabilityApiService(retrofit: Retrofit): AvailabilityApiService {
+        return retrofit.create(AvailabilityApiService::class.java)
     }
 
     fun createHttpClientWithTokenManager(tokenManager: com.calico.tutor.data.datasource.local.TokenManager): OkHttpClient {
-        return createHttpClient(tokenManager, null)
+        return createHttpClient(tokenManager)
     }
 
-    fun createHttpClientWithTokenManagerAndLatency(
-        tokenManager: com.calico.tutor.data.datasource.local.TokenManager,
-        onLatencyMeasured: (endpoint: String, method: String, durationMs: Long, statusCode: Int) -> Unit
-    ): OkHttpClient {
-        return createHttpClient(tokenManager, onLatencyMeasured)
-    }
-
-    private fun createHttpClient(
-        tokenManager: com.calico.tutor.data.datasource.local.TokenManager?,
-        onLatencyMeasured: ((endpoint: String, method: String, durationMs: Long, statusCode: Int) -> Unit)?
-    ): OkHttpClient {
+    private fun createHttpClient(tokenManager: com.calico.tutor.data.datasource.local.TokenManager?): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -68,10 +46,6 @@ object RetrofitClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-
-        if (onLatencyMeasured != null) {
-            builder.addInterceptor(LatencyTelemetryInterceptor(onLatencyMeasured))
-        }
 
         if (tokenManager != null) {
             builder.addInterceptor(TokenInterceptor(tokenManager))

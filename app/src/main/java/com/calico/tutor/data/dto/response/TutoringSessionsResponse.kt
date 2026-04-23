@@ -5,10 +5,6 @@ import com.google.gson.annotations.SerializedName
 data class TutoringSessionsResponse(
     @SerializedName("success")
     val success: Boolean = false,
-    @SerializedName("tutorId")
-    val tutorId: String = "",
-    @SerializedName("count")
-    val count: Int = 0,
     @SerializedName("sessions")
     val sessions: List<TutoringSessionData> = emptyList()
 )

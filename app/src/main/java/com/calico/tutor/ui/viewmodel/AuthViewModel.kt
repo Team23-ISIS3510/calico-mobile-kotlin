@@ -12,8 +12,8 @@ import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
 import com.calico.tutor.domain.usecase.GoogleLoginUseCase
+import com.calico.tutor.domain.usecase.ClearTokenUseCase
 import com.calico.tutor.domain.utils.Result
-import com.calico.tutor.util.EmailValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +30,8 @@ class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
     private val getAuthTokenUseCase: GetAuthTokenUseCase,
-    private val googleLoginUseCase: GoogleLoginUseCase
+    private val googleLoginUseCase: GoogleLoginUseCase,
+    private val clearTokenUseCase: ClearTokenUseCase
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
@@ -53,18 +54,6 @@ class AuthViewModel(
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
-            // Guard: Validate email format
-            guard(!EmailValidator.isValidEmail(email.trim())) {
-                _authState.value = AuthState.Error("Invalid email format", retryable = false)
-                return@launch
-            }
-            
-            // Guard: Validate password length
-            guard(password.length < 6) {
-                _authState.value = AuthState.Error("Password must be at least 6 characters", retryable = false)
-                return@launch
-            }
-            
             _authState.value = AuthState.Loading
             lastLoginCredentials = email to password
 
@@ -82,22 +71,13 @@ class AuthViewModel(
                         }
                     }
                     AuthState.Error(
-                        result.message ?: "Invalid email or password",
+                        result.message ?: "Login failed",
                         retryable = isNetworkError
                     )
                 }
                 is Result.Loading -> AuthState.Loading
             }
         }
-    }
-    
-    // Guard pattern helper: Returns if condition is true, otherwise continues
-    private inline fun guard(condition: Boolean, block: () -> Unit): Boolean {
-        if (condition) {
-            block()
-            return true
-        }
-        return false
     }
 
     fun register(
@@ -109,30 +89,6 @@ class AuthViewModel(
         courses: List<String>? = null
     ) {
         viewModelScope.launch {
-            // Guard: Validate email format
-            guard(!EmailValidator.isValidEmail(email.trim())) {
-                _authState.value = AuthState.Error("Invalid email format", retryable = false)
-                return@launch
-            }
-            
-            // Guard: Validate password length
-            guard(password.length < 6) {
-                _authState.value = AuthState.Error("Password must be at least 6 characters", retryable = false)
-                return@launch
-            }
-            
-            // Guard: Validate name length
-            guard(name.trim().length < 2) {
-                _authState.value = AuthState.Error("Name must be at least 2 characters", retryable = false)
-                return@launch
-            }
-            
-            // Guard: Validate phone length
-            guard(phone.trim().length < 10) {
-                _authState.value = AuthState.Error("Please enter a valid phone number", retryable = false)
-                return@launch
-            }
-            
             _authState.value = AuthState.Loading
             lastRegisterData = RegisterData(email, password, name, phone, isTutor, courses)
 
@@ -272,6 +228,7 @@ class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
     private val registerUseCase = ServiceLocator.registerUseCase(context)
     private val getAuthTokenUseCase = ServiceLocator.getAuthTokenUseCase(context)
     private val googleLoginUseCase = ServiceLocator.googleLoginUseCase(context)
+    private val clearTokenUseCase = ServiceLocator.clearTokenUseCase(context)
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
@@ -280,10 +237,10 @@ class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
                 loginUseCase = loginUseCase,
                 registerUseCase = registerUseCase,
                 getAuthTokenUseCase = getAuthTokenUseCase,
-                googleLoginUseCase = googleLoginUseCase
+                googleLoginUseCase = googleLoginUseCase,
+                clearTokenUseCase = clearTokenUseCase
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
-

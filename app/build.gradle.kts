@@ -10,6 +10,25 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+val envProperties = Properties().apply {
+    val file = rootProject.file(".env")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+val googleWebClientId = localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")?.trim().orEmpty()
+val firebaseApiKey = (
+    localProperties.getProperty("FIREBASE_API_KEY")
+        ?: envProperties.getProperty("FIREBASE_API_KEY")
+    )?.trim().orEmpty()
+
+require(googleWebClientId.isNotBlank()) {
+    "Missing GOOGLE_WEB_CLIENT_ID in local.properties"
+}
+
+require(firebaseApiKey.isNotBlank()) {
+    "Missing FIREBASE_API_KEY in local.properties or .env"
+}
+
 android {
     namespace = "com.calico.tutor"
     compileSdk = 36
@@ -26,8 +45,16 @@ android {
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
-            "\"${localProperties["GOOGLE_WEB_CLIENT_ID"] ?: ""}\""
+            "\"$googleWebClientId\""
         )
+
+        buildConfigField(
+            "String",
+            "FIREBASE_API_KEY",
+            "\"$firebaseApiKey\""
+        )
+
+        resValue("string", "google_web_client_id", googleWebClientId)
     }
 
     buildTypes {
@@ -47,6 +74,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
 }
