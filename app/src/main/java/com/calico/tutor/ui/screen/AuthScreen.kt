@@ -17,6 +17,7 @@ import com.calico.tutor.ui.component.NavBarItem
 import com.calico.tutor.ui.theme.WhiteBase
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
+import com.calico.tutor.ui.viewmodel.CoursesViewModel
 import com.calico.tutor.util.JwtUtils
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -95,9 +96,12 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                                 )
                             }
                             "courses" -> {
+                                val dbHelper = remember { DatabaseHelper(context) }
+                                val coursesViewModel = remember { CoursesViewModel(context, dbHelper) }
                                 CoursesScreen(
                                     tutorId = firebaseUid ?: email,
-                                    context = context
+                                    context = context,
+                                    viewModel = coursesViewModel
                                 )
                             }
                             "statistics" -> {
