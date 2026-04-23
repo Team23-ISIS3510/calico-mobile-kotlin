@@ -4,9 +4,17 @@ import com.calico.tutor.data.dto.response.SubjectsHistoryResponse
 import com.calico.tutor.data.dto.response.TutorResponse
 import com.calico.tutor.data.dto.response.TutoringSessionsResponse
 import com.calico.tutor.data.dto.response.TutorOccupancyResponse
+import com.calico.tutor.data.dto.response.CourseResponse
+import com.calico.tutor.data.dto.response.TutorCoursesResponse
+import com.calico.tutor.data.dto.response.TutorCourseData
+import com.calico.tutor.data.dto.response.CourseApplicationResponse
+import com.calico.tutor.data.dto.response.AvailableCourseResponse
+import com.calico.tutor.data.dto.response.AllCoursesResponse
 import com.calico.tutor.domain.model.SessionHistory
 import com.calico.tutor.data.dto.AvailabilityResponseDto
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Body
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -31,4 +39,25 @@ interface SubjectsApiService {
 
     @GET("analytics/tutor-occupancy/{tutorId}")
     suspend fun getTutorOccupancy(@Path("tutorId") tutorId: String): TutorOccupancyResponse
+
+    @GET("courses/{courseId}")
+    suspend fun getCourseById(@Path("courseId") courseId: String): CourseResponse
+
+    @GET("tutors/{tutorId}/courses")
+    suspend fun getTutorCourses(@Path("tutorId") tutorId: String): List<TutorCourseData>
+
+    @GET("tutors/{tutorId}/applications")
+    suspend fun getTutorApplications(@Path("tutorId") tutorId: String): List<CourseApplicationResponse>
+
+    @GET("courses")
+    suspend fun getAllAvailableCourses(): AllCoursesResponse
+
+    @POST("tutors/apply")
+    suspend fun applyForCourse(@Body request: ApplyCourseRequest): Map<String, Any>
 }
+
+data class ApplyCourseRequest(
+    val tutorId: String,
+    val courseId: String,
+    val notes: String? = null
+)

@@ -9,12 +9,6 @@ import android.util.Log
 /**
  * Implementación del Repository Pattern para Subjects (Recommended Subjects)
  * 
- * Responsabilidades:
- * ✅ Obtener historial de materias del DataSource
- * ✅ Aplicar lógica de filtrado/ordenamiento si es necesario
- * ✅ Manejar errores y convertirlos a Result<T>
- * ✅ Abstraer al ViewModel de los detalles de HTTP y transformación
- * 
  * El ViewModel usa SubjectsRepository sin conocer DetallesImpl
  */
 class SubjectsRepositoryImpl(
@@ -22,15 +16,7 @@ class SubjectsRepositoryImpl(
 ) : SubjectsRepository {
     
     private val TAG = "SubjectsRepository"
-    
-    /**
-     * Obtiene historial de materias a través del DataSource
-     * 
-     * Flujo:
-     * 1. Obtener datos del backend via SubjectsApiService
-     * 2. Opcionalmente aplicar transformaciones
-     * 3. Retornar Result<SubjectsHistoryResponse>
-     */
+
     override suspend fun getSubjectsHistory(): Result<SubjectsHistoryResponse> {
         return try {
             Log.d(TAG, "Fetching subjects history...")
