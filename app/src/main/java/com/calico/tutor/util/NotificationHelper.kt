@@ -20,6 +20,7 @@ object NotificationHelper {
     private const val CHANNEL_ID = "calico_tutor_alerts"
     private const val CHANNEL_NAME = "Session Alerts"
     private const val NOTIFICATION_ID_BASE = 1000
+    private const val CONNECTION_WARNING_ID = 9999
     private const val TAG = "NotificationHelper"
     
     /**
@@ -90,6 +91,49 @@ object NotificationHelper {
             Log.d(TAG, "Notification displayed successfully: id=$notificationId")
         } catch (e: Exception) {
             Log.e(TAG, "Error displaying notification: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Shows a connection warning notification when network latency is high
+     * @param context Application context
+     * @param latencyMs Measured network latency in milliseconds
+     */
+    fun showConnectionWarningNotification(
+        context: Context,
+        latencyMs: Long
+    ) {
+        // Check if app has notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            if (!hasPermission) {
+                Log.w(TAG, "POST_NOTIFICATIONS permission not granted. Cannot show connection warning.")
+                return
+            }
+        }
+        
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        Log.d(TAG, "Creating connection warning notification: latency=${latencyMs}ms")
+        
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("⚠️ Connection Warning")
+            .setContentText("Your internet seems slow. This might cause lag in your upcoming session.")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        
+        try {
+            notificationManager.notify(CONNECTION_WARNING_ID, notification)
+            Log.d(TAG, "Connection warning notification displayed successfully (latency: ${latencyMs}ms)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error displaying connection warning notification: ${e.message}", e)
         }
     }
 }
