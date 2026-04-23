@@ -20,7 +20,7 @@ class AvailabilityRepositoryImpl(
     override suspend fun getAvailabilities(tutorId: String): Result<List<AvailabilityItem>> {
         return try {
             Log.d(TAG, "Cargando disponibilidades para tutor: $tutorId")
-            val response = apiService.getAvailabilities(tutorId)
+            val response = apiService.getAvailabilities(tutorId = tutorId)
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val items = response.getList()
                 .map { it.toModel() }
@@ -45,8 +45,18 @@ class AvailabilityRepositoryImpl(
         return try {
             Log.d(TAG, "POST /availability/create → ${request.date} ${request.startTime}-${request.endTime}")
             val response = apiService.createAvailability(request)
-            Log.d(TAG, "Creada con id: ${response.id}")
-            Result.Success(response.toModel())
+            val body = response.body()
+            val created = body?.availability
+            when {
+                response.isSuccessful && created != null -> {
+                    Log.d(TAG, "Creada con id: ${created.id} (${response.code()})")
+                    Result.Success(created.toModel())
+                }
+                else -> {
+                    Log.e(TAG, "Fallo al crear disponibilidad. HTTP ${response.code()} body=$body")
+                    Result.Error(Exception("HTTP ${response.code()}"), "Create failed on server (${response.code()})")
+                }
+            }
         } catch (e: HttpException) {
             Log.e(TAG, "HTTP ${e.code()} al crear disponibilidad: ${e.message()}")
             Result.Error(e, "Server error (${e.code()}). Please try again later")
@@ -60,8 +70,18 @@ class AvailabilityRepositoryImpl(
         return try {
             Log.d(TAG, "PUT /availability/$id")
             val response = apiService.updateAvailability(id, request)
-            Log.d(TAG, "Actualizada disponibilidad: $id")
-            Result.Success(response.toModel())
+            val body = response.body()
+            val updated = body?.availability
+            when {
+                response.isSuccessful && updated != null -> {
+                    Log.d(TAG, "Actualizada disponibilidad: $id (${response.code()})")
+                    Result.Success(updated.toModel())
+                }
+                else -> {
+                    Log.e(TAG, "Fallo al actualizar disponibilidad $id. HTTP ${response.code()} body=$body")
+                    Result.Error(Exception("HTTP ${response.code()}"), "Update failed on server (${response.code()})")
+                }
+            }
         } catch (e: HttpException) {
             Log.e(TAG, "HTTP ${e.code()} al actualizar disponibilidad: ${e.message()}")
             Result.Error(e, "Server error (${e.code()}). Please try again later")
@@ -71,26 +91,26 @@ class AvailabilityRepositoryImpl(
         }
     }
 
-    override suspend fun deleteAvailability(id: String): Result<Unit> {
+    override suspend fun deleteAvailabilitiesByTutor(tutorId: String): Result<Unit> {
         return try {
-            Log.d(TAG, "DELETE /availability/$id")
-            val response = apiService.deleteAvailability(id)
+            Log.d(TAG, "DELETE /availability/tutor/$tutorId")
+            val response = apiService.deleteAvailabilitiesByTutor(tutorId)
             when {
                 response.isSuccessful -> {
-                    Log.d(TAG, "Eliminada disponibilidad: $id (${response.code()})")
+                    Log.d(TAG, "Eliminadas disponibilidades del tutor: $tutorId (${response.code()})")
                     Result.Success(Unit)
                 }
-                response.code() == 404 -> Result.Error(Exception("404"), "Availability not found")
+                response.code() == 404 -> Result.Error(Exception("404"), "Tutor availability list not found")
                 else -> {
-                    Log.e(TAG, "HTTP ${response.code()} al eliminar disponibilidad")
+                    Log.e(TAG, "HTTP ${response.code()} al eliminar disponibilidades del tutor")
                     Result.Error(Exception("HTTP ${response.code()}"), "Server error. Please try again later")
                 }
             }
         } catch (e: HttpException) {
-            if (e.code() == 404) Result.Error(e, "Availability not found")
+            if (e.code() == 404) Result.Error(e, "Tutor availability list not found")
             else Result.Error(e, "Server error. Please try again later")
         } catch (e: Exception) {
-            Log.e(TAG, "Error eliminando disponibilidad: ${e.message}", e)
+            Log.e(TAG, "Error eliminando disponibilidades del tutor: ${e.message}", e)
             Result.Error(e, "Server error. Please try again later")
         }
     }

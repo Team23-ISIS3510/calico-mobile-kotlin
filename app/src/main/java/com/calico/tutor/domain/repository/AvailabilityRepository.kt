@@ -9,5 +9,5 @@ interface AvailabilityRepository {
     suspend fun getAvailabilities(tutorId: String): Result<List<AvailabilityItem>>
     suspend fun createAvailability(request: CreateAvailabilityRequest): Result<AvailabilityItem>
     suspend fun updateAvailability(id: String, request: UpdateAvailabilityRequest): Result<AvailabilityItem>
-    suspend fun deleteAvailability(id: String): Result<Unit>
+    suspend fun deleteAvailabilitiesByTutor(tutorId: String): Result<Unit>
 }

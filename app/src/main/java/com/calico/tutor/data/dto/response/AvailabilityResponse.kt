@@ -13,6 +13,13 @@ data class AvailabilityResponse(
     @SerializedName("course")    val course: String? = null
 )
 
+// Wrapper for POST/PUT /availability responses
+data class AvailabilityMutationResponse(
+    @SerializedName("success")  val success: Boolean = false,
+    @SerializedName("message")  val message: String? = null,
+    @SerializedName("availability") val availability: AvailabilityResponse? = null
+)
+
 // Wrapper for GET /availability - backend returns an object, not a plain array
 data class AvailabilityListResponse(
     @SerializedName("data")           val data: List<AvailabilityResponse>? = null,

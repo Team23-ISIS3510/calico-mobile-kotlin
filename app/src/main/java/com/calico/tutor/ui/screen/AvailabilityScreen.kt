@@ -280,7 +280,7 @@ private fun SeeAvailabilitiesTab(
                                 color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(dayItems) { item ->
-                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.delete(item.id) })
+                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.deleteByTutor() })
                             Spacer(Modifier.height(8.dp))
                         }
                     }
@@ -558,10 +558,10 @@ private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelet
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Delete availability") },
-            text = { Text("Delete \"${item.title}\"?") },
+            title = { Text("Delete tutor availabilities") },
+            text = { Text("This will delete all availabilities for this tutor. Continue?") },
             confirmButton = {
-                TextButton(onClick = { showDialog = false; onDelete() }) { Text("Delete", color = Color.Red) }
+                TextButton(onClick = { showDialog = false; onDelete() }) { Text("Delete all", color = Color.Red) }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) { Text("Cancel") }
@@ -614,10 +614,10 @@ private fun getRepeatDates(baseDate: String, option: RepeatOption): List<String>
     val base = try { fmt.parse(baseDate)!! } catch (e: Exception) { return listOf(baseDate) }
     return when (option) {
         RepeatOption.NONE -> listOf(baseDate)
-        RepeatOption.WEEKLY -> (0..3).map { w ->
+        RepeatOption.WEEKLY -> (0..15).map { w ->
             fmt.format(Calendar.getInstance().apply { time = base; add(Calendar.WEEK_OF_YEAR, w) }.time)
         }
-        RepeatOption.MONTHLY -> (0..2).map { m ->
+        RepeatOption.MONTHLY -> (0..3).map { m ->
             fmt.format(Calendar.getInstance().apply { time = base; add(Calendar.MONTH, m) }.time)
         }
     }

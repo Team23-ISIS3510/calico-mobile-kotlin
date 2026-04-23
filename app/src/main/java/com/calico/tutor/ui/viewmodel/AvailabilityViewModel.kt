@@ -70,9 +70,26 @@ class AvailabilityViewModel(
             _actionState.value = AvailabilityActionState.Loading
             when (val result = repository.createAvailability(request)) {
                 is Result.Success -> {
-                    Log.d(TAG, "Creada disponibilidad: ${result.data.id}")
-                    _actionState.value = AvailabilityActionState.Done
-                    load()
+                    Log.d(TAG, "Creada disponibilidad: ${result.data.id}. Verificando sincronizacion...")
+                    when (val sync = repository.getAvailabilities(tutorId)) {
+                        is Result.Success -> {
+                            _listState.value = AvailabilityListState.Success(sync.data)
+                            val persisted = sync.data.any { it.id == result.data.id }
+                            if (persisted) {
+                                _actionState.value = AvailabilityActionState.Done
+                            } else {
+                                _actionState.value = AvailabilityActionState.Error(
+                                    "Created request succeeded, but the server list did not include the new item"
+                                )
+                            }
+                        }
+                        is Result.Error -> {
+                            _actionState.value = AvailabilityActionState.Error(
+                                sync.message ?: "Created, but failed to refresh from server"
+                            )
+                        }
+                        is Result.Loading -> _actionState.value = AvailabilityActionState.Loading
+                    }
                 }
                 is Result.Error -> {
                     Log.e(TAG, "Error creando: ${result.message}")
@@ -88,9 +105,32 @@ class AvailabilityViewModel(
             _actionState.value = AvailabilityActionState.Loading
             when (val result = repository.updateAvailability(id, request)) {
                 is Result.Success -> {
-                    Log.d(TAG, "Actualizada disponibilidad: $id")
-                    _actionState.value = AvailabilityActionState.Done
-                    load()
+                    Log.d(TAG, "Actualizada disponibilidad: $id. Verificando sincronizacion...")
+                    when (val sync = repository.getAvailabilities(tutorId)) {
+                        is Result.Success -> {
+                            _listState.value = AvailabilityListState.Success(sync.data)
+                            val updated = sync.data.firstOrNull { it.id == id }
+                            val matches = updated != null &&
+                                (request.title == null || updated.title == request.title) &&
+                                (request.date == null || updated.date == request.date) &&
+                                (request.startTime == null || updated.startTime == request.startTime) &&
+                                (request.endTime == null || updated.endTime == request.endTime)
+
+                            if (matches) {
+                                _actionState.value = AvailabilityActionState.Done
+                            } else {
+                                _actionState.value = AvailabilityActionState.Error(
+                                    "Update request succeeded, but refreshed data did not reflect the changes"
+                                )
+                            }
+                        }
+                        is Result.Error -> {
+                            _actionState.value = AvailabilityActionState.Error(
+                                sync.message ?: "Updated, but failed to refresh from server"
+                            )
+                        }
+                        is Result.Loading -> _actionState.value = AvailabilityActionState.Loading
+                    }
                 }
                 is Result.Error -> {
                     Log.e(TAG, "Error actualizando: ${result.message}")
@@ -101,22 +141,35 @@ class AvailabilityViewModel(
         }
     }
 
-    fun delete(id: String) {
-        // Optimistic removal so the UI reacts instantly
-        val currentItems = (_listState.value as? AvailabilityListState.Success)?.items ?: emptyList()
-        _listState.value = AvailabilityListState.Success(currentItems.filter { it.id != id })
-
+    fun deleteByTutor() {
         viewModelScope.launch {
-            when (val result = repository.deleteAvailability(id)) {
+            _actionState.value = AvailabilityActionState.Loading
+            when (val result = repository.deleteAvailabilitiesByTutor(tutorId)) {
                 is Result.Success -> {
-                    Log.d(TAG, "Eliminada disponibilidad: $id")
-                    load() // sync list from server
+                    Log.d(TAG, "Eliminadas disponibilidades del tutor: $tutorId. Verificando sincronizacion...")
+                    when (val sync = repository.getAvailabilities(tutorId)) {
+                        is Result.Success -> {
+                            _listState.value = AvailabilityListState.Success(sync.data)
+                            val stillExists = sync.data.isNotEmpty()
+                            if (!stillExists) {
+                                _actionState.value = AvailabilityActionState.Done
+                            } else {
+                                _actionState.value = AvailabilityActionState.Error(
+                                    "Delete request succeeded, but availabilities still appear after refresh"
+                                )
+                            }
+                        }
+                        is Result.Error -> {
+                            _actionState.value = AvailabilityActionState.Error(
+                                sync.message ?: "Deleted, but failed to refresh from server"
+                            )
+                        }
+                        is Result.Loading -> _actionState.value = AvailabilityActionState.Loading
+                    }
                 }
                 is Result.Error -> {
                     Log.e(TAG, "Error eliminando: ${result.message}")
-                    // Restore list and notify error
-                    _listState.value = AvailabilityListState.Success(currentItems)
-                    _actionState.value = AvailabilityActionState.Error(result.message ?: "Error deleting availability")
+                    _actionState.value = AvailabilityActionState.Error(result.message ?: "Error deleting tutor availabilities")
                 }
                 is Result.Loading -> {}
             }
