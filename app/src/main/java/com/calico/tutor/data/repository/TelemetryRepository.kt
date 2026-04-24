@@ -6,6 +6,7 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.Log
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
+import com.calico.tutor.data.dto.HomepageLoadRequest
 import com.calico.tutor.data.dto.request.BugReportRequest
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.CoroutineScope
@@ -161,6 +162,31 @@ class TelemetryRepository(
                 }
             } catch (e: Exception) {
                 Log.e("TelemetryRepository", "Failed to send latency report", e)
+            }
+        }
+    }
+
+    fun reportHomepageLoad(
+        loadTimeMs: Long,
+        connectivityStatus: String,
+        userId: String?
+    ) {
+        scope.launch {
+            val request = HomepageLoadRequest(
+                loadTimeMs = loadTimeMs,
+                connectivityStatus = connectivityStatus,
+                userId = userId
+            )
+
+            try {
+                Log.d("TelemetryRepository", "Sending HOMEPAGE_LOAD telemetry: ${gson.toJson(request)}")
+                var response = apiService.reportHomepageLoad(request)
+                if (!response.isSuccessful) {
+                    // Retry once without surfacing any UI error.
+                    response = apiService.reportHomepageLoad(request)
+                }
+            } catch (_: Exception) {
+                // Fail silently by requirement.
             }
         }
     }

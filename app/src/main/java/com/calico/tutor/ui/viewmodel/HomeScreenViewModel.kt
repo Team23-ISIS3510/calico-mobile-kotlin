@@ -1,6 +1,8 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -13,6 +15,7 @@ import com.calico.tutor.data.local.CacheDatabase
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.calico.tutor.util.NotificationHelper
+import com.calico.tutor.util.JwtUtils
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -101,11 +104,37 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     private val userPrefs    = ServiceLocator.userPreferences(context)
     private val memoryCache  = ServiceLocator.inMemoryCache()
     private val fileManager  = ServiceLocator.fileManager(context)
+    private val telemetryRepository = ServiceLocator.telemetryRepository(context)
+    private val tokenManager = ServiceLocator.provideTokenManager(context)
     private val gson         = Gson()
 
     private val shownNotifications        = mutableSetOf<String>()
     private var lastConnectionWarningTime = 0L
     private val CONNECTION_WARNING_COOLDOWN_MS = 300_000L
+    private var homepageLoadStartMs: Long = 0L
+    private var homepageLoadReported = false
+
+    fun onHomepageOpened() {
+        homepageLoadStartMs = System.currentTimeMillis()
+        homepageLoadReported = false
+    }
+
+    fun onHomepageContentRendered(isSessionsReady: Boolean, isTopSubjectsReady: Boolean) {
+        if (!isSessionsReady || !isTopSubjectsReady || homepageLoadReported) return
+        if (homepageLoadStartMs <= 0L) return
+
+        val loadTimeMs = System.currentTimeMillis() - homepageLoadStartMs
+        val connectivityStatus = if (isDeviceOnline()) "online" else "offline"
+        val firebaseUid = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
+
+        homepageLoadReported = true
+        telemetryRepository.reportHomepageLoad(
+            loadTimeMs = loadTimeMs,
+            connectivityStatus = connectivityStatus,
+            userId = firebaseUid
+        )
+        Log.d(TAG, "Homepage telemetry sent: load_time_ms=$loadTimeMs, connectivity_status=$connectivityStatus, user_id=${firebaseUid ?: "null"}")
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MULTI-THREADING: carga paralela con corrutinas anidadas
@@ -358,6 +387,14 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
         }
         latencies.average().toLong()
     } catch (e: Exception) { 2000L }
+
+    private fun isDeviceOnline(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val activeNetwork = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // HELPERS DE MAPEO
