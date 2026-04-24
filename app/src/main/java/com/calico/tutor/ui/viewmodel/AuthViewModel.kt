@@ -27,11 +27,16 @@ sealed class AuthState {
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
-    private val getAuthTokenUseCase: GetAuthTokenUseCase
+    private val getAuthTokenUseCase: GetAuthTokenUseCase,
+    private val context: Context
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    init {
+        checkAuthStatus()
+    }
 
     private val retryQueue = RetryQueue()
 
@@ -212,6 +217,13 @@ class AuthViewModel(
         _authState.value = AuthState.Idle
     }
 
+    fun logout() {
+        // Clear token using TokenManager (EncryptedSharedPreferences)
+        val tokenManager = ServiceLocator.provideTokenManager(context)
+        tokenManager.clearToken()
+        _authState.value = AuthState.Idle
+    }
+
     fun getPendingRetries(): Int = retryQueue.getPendingRequests()
 
     private fun isNetworkRelated(exception: Throwable): Boolean {
@@ -223,7 +235,7 @@ class AuthViewModel(
     }
 }
 
-class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
+class AuthViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     private val loginUseCase = ServiceLocator.loginUseCase(context)
     private val registerUseCase = ServiceLocator.registerUseCase(context)
     private val getAuthTokenUseCase = ServiceLocator.getAuthTokenUseCase(context)
@@ -234,7 +246,8 @@ class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
             return AuthViewModel(
                 loginUseCase = loginUseCase,
                 registerUseCase = registerUseCase,
-                getAuthTokenUseCase = getAuthTokenUseCase
+                getAuthTokenUseCase = getAuthTokenUseCase,
+                context = context
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

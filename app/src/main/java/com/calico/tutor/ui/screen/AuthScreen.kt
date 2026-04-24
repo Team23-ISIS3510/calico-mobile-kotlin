@@ -18,6 +18,7 @@ import com.calico.tutor.ui.theme.WhiteBase
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.viewmodel.ProfileViewModel
 import com.calico.tutor.util.JwtUtils
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -82,7 +83,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                                     tutorId = firebaseUid ?: email,
                                     context = context,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     },
                                     onNavigateToTopSubjects = {
                                         setCurrentScreen("topSubjects")
@@ -108,11 +109,11 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                                 StatisticsScreen()
                             }
                             "profile" -> {
+                                val profileViewModel = remember { ProfileViewModel(context) }
                                 ProfileScreen(
-                                    userName = userName,
-                                    userEmail = email ?: "",
+                                    viewModel = profileViewModel,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     }
                                 )
                             }
@@ -122,7 +123,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                                     tutorId = firebaseUid ?: email,
                                     context = context,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     },
                                     onNavigateToTopSubjects = {
                                         setCurrentScreen("topSubjects")
@@ -167,7 +168,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context) {
                     },
                     onBackClick = {
                         setShowLogin(true)
-                        viewModel.resetState()
+                        viewModel.logout()
                     },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,

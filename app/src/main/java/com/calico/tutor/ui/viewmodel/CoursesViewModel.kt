@@ -23,7 +23,8 @@ sealed class CoursesState {
     data class Success(
         val approvedCourses: List<TutorCourseData>,
         val availableCourses: List<AvailableCourseResponse>,
-        val applications: List<CourseApplicationResponse>
+        val applications: List<CourseApplicationResponse>,
+        val isOffline: Boolean = false
     ) : CoursesState()
     data class Error(val message: String) : CoursesState()
 }
@@ -99,7 +100,8 @@ class CoursesViewModel(
                 _coursesState.value = CoursesState.Success(
                     approvedCourses = approvedCourses,
                     availableCourses = availableCourses,
-                    applications = applications
+                    applications = applications,
+                    isOffline = false
                 )
 
                 Log.d("CoursesViewModel", "Loaded: ${approvedCourses.size} approved, ${availableCourses.size} available")
@@ -168,7 +170,8 @@ class CoursesViewModel(
                 _coursesState.value = CoursesState.Success(
                     approvedCourses = localApprovedCourses,
                     availableCourses = localAvailableCourses,
-                    applications = localApplicationsList
+                    applications = localApplicationsList,
+                    isOffline = true
                 )
 
                 Log.d("CoursesViewModel", "Loaded from cache: ${filteredAvailable.size} available, ${localApproved.size} approved, ${localApplications.size} apps")
@@ -216,7 +219,8 @@ class CoursesViewModel(
                 _coursesState.value = CoursesState.Success(
                     approvedCourses = localApprovedCourses,
                     availableCourses = localAvailableCourses,
-                    applications = emptyList()
+                    applications = emptyList(),
+                    isOffline = true
                 )
             }
         }

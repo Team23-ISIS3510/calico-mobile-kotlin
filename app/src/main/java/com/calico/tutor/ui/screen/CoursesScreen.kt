@@ -100,6 +100,22 @@ fun CoursesScreen(
                     }
                 }
                 is CoursesState.Success -> {
+                    if (state.isOffline) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                        ) {
+                            Text(
+                                text = "Viewing offline data. Check your connection.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFFF57C00),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
                     if (state.approvedCourses.isNotEmpty()) {
                         CollapsibleSection(
                             title = "MY COURSES (${state.approvedCourses.size})",
