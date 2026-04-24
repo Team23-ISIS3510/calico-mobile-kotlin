@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.screen.DatabaseHelper
+import com.calico.tutor.util.JwtUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +52,7 @@ class ProfileViewModel(
             _profileState.value = ProfileState.Loading
 
             val email = tokenManager.getEmail() ?: "User"
-            val firebaseUid = tokenManager.getFirebaseUid()
+            val firebaseUid = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
             
             // Check network once at the start
             val hasNetwork = isNetworkAvailable()
@@ -66,8 +67,10 @@ class ProfileViewModel(
             try {
                 // Try online first
                 val tutorResponse = withContext(Dispatchers.IO) {
-                    firebaseUid?.let { uid ->
-                        ServiceLocator.subjectsApiService(context).getTutorProfile(uid)
+                    if (firebaseUid != null) {
+                        ServiceLocator.subjectsApiService(context).getTutorProfile(firebaseUid)
+                    } else {
+                        null
                     }
                 }
 

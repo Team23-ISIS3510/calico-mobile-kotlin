@@ -15,12 +15,6 @@ import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
-import com.calico.tutor.ui.viewmodel.CoursesViewModel
-import com.calico.tutor.ui.viewmodel.ProfileViewModel
-import com.calico.tutor.util.JwtUtils
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
@@ -84,103 +78,6 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     } else {
                         Log.w(TAG, "Silent sign-in falló, token seguirá hasta expirar")
                     }
-                }
-            } catch (e: Exception) {
-                Log.e("AuthScreen", "❌ Error al extraer Firebase UID: ${e.message}")
-                null
-            } ?: tokenManager.getFirebaseUid() // Fallback: intentar obtener del almacenamiento
-            
-            val userName = email
-                .substringBefore("@")
-                .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-            
-            // Bottom navigation items
-            val navItems = listOf(
-                NavBarItem(label = "Home", icon = Icons.Filled.Home, route = "home"),
-                NavBarItem(label = "Courses", icon = Icons.Filled.Home, route = "courses"),
-                NavBarItem(label = "Statistics", icon = Icons.Filled.Home, route = "statistics"),
-                NavBarItem(label = "Profile", icon = Icons.Filled.Person, route = "profile")
-            )
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(WhiteBase)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Screen content (takes up available space)
-                    Box(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        when (currentScreen) {
-                            "home" -> {
-                                HomeScreen(
-                                    userName = userName,
-                                    tutorId = firebaseUid ?: email,
-                                    context = context,
-                                    onLogout = {
-                                        viewModel.logout()
-                                    },
-                                    onNavigateToTopSubjects = {
-                                        setCurrentScreen("topSubjects")
-                                    }
-                                )
-                            }
-                            "topSubjects" -> {
-                                TopSubjectsScreen(
-                                    context = context,
-                                    onNavigateBack = { setCurrentScreen("home") }
-                                )
-                            }
-                            "courses" -> {
-                                val dbHelper = remember { DatabaseHelper(context) }
-                                val coursesViewModel = remember { CoursesViewModel(context, dbHelper) }
-                                CoursesScreen(
-                                    tutorId = firebaseUid ?: email,
-                                    context = context,
-                                    viewModel = coursesViewModel
-                                )
-                            }
-                            "statistics" -> {
-                                StatisticsScreen()
-                            }
-                            "profile" -> {
-                                val profileViewModel = remember { ProfileViewModel(context) }
-                                ProfileScreen(
-                                    viewModel = profileViewModel,
-                                    onLogout = {
-                                        viewModel.logout()
-                                    }
-                                )
-                            }
-                            else -> {
-                                HomeScreen(
-                                    userName = userName,
-                                    tutorId = firebaseUid ?: email,
-                                    context = context,
-                                    onLogout = {
-                                        viewModel.logout()
-                                    },
-                                    onNavigateToTopSubjects = {
-                                        setCurrentScreen("topSubjects")
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Bottom Navigation Bar
-                    BottomNavBar(
-                        currentRoute = currentScreen,
-                        items = navItems,
-                        onNavigate = { route ->
-                            if (route != "topSubjects") { // Don't navigate to topSubjects from navbar
-                                setCurrentScreen(route)
-                            }
-                        }
-                    )
                 }
             }
         }
@@ -276,7 +173,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     },
                     onBackClick = {
                         setShowLogin(true)
-                        viewModel.logout()
+                        viewModel.resetState()
                     },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,

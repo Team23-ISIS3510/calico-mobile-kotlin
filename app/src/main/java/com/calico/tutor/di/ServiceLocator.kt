@@ -1,6 +1,7 @@
 package com.calico.tutor.di
 
 import android.content.Context
+import com.calico.tutor.data.cache.InMemoryCache
 import com.calico.tutor.data.datasource.local.TokenManager
 import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.AuthApiService
@@ -8,6 +9,9 @@ import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.AvailabilityApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
+import com.calico.tutor.data.local.CacheDatabase
+import com.calico.tutor.data.local.FileManager
+import com.calico.tutor.data.local.UserPreferencesDataStore
 import com.calico.tutor.data.repository.TelemetryRepository
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
@@ -18,11 +22,44 @@ import com.calico.tutor.domain.repository.AvailabilityRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
-import com.calico.tutor.ui.screen.DatabaseHelper
 import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 import com.calico.tutor.domain.usecase.ClearTokenUseCase
+import com.calico.tutor.ui.screen.DatabaseHelper
 
 object ServiceLocator {
+    // ── Almacenamiento local y caché ─────────────────────────────────────────
+    @Volatile private var _cacheDatabase: CacheDatabase? = null
+    @Volatile private var _userPreferences: UserPreferencesDataStore? = null
+    @Volatile private var _inMemoryCache: InMemoryCache? = null
+    @Volatile private var _fileManager: FileManager? = null
+    @Volatile private var _databaseHelper: DatabaseHelper? = null
+
+    fun cacheDatabase(context: Context): CacheDatabase =
+        _cacheDatabase ?: synchronized(this) {
+            _cacheDatabase ?: CacheDatabase(context.applicationContext).also { _cacheDatabase = it }
+        }
+
+    fun userPreferences(context: Context): UserPreferencesDataStore =
+        _userPreferences ?: synchronized(this) {
+            _userPreferences ?: UserPreferencesDataStore(context.applicationContext).also { _userPreferences = it }
+        }
+
+    fun inMemoryCache(): InMemoryCache =
+        _inMemoryCache ?: synchronized(this) {
+            _inMemoryCache ?: InMemoryCache(maxSize = 20).also { _inMemoryCache = it }
+        }
+
+    fun fileManager(context: Context): FileManager =
+        _fileManager ?: synchronized(this) {
+            _fileManager ?: FileManager(context.applicationContext).also { _fileManager = it }
+        }
+
+    fun provideDatabaseHelper(context: Context): DatabaseHelper =
+        _databaseHelper ?: synchronized(this) {
+            _databaseHelper ?: DatabaseHelper(context.applicationContext).also { _databaseHelper = it }
+        }
+
+    // ── Autenticación ─────────────────────────────────────────────────────────
     @Volatile
     private var _tokenManager: TokenManager? = null
     @Volatile
@@ -40,9 +77,6 @@ object ServiceLocator {
     @Volatile
     private var analyticsRepository: AnalyticsRepository? = null
     @Volatile
-    private var telemetryRepository: TelemetryRepository? = null
-    @Volatile
-    private var databaseHelper: DatabaseHelper? = null
     private var availabilityRepository: AvailabilityRepository? = null
     @Volatile
     private var _telemetryRepository: TelemetryRepository? = null
@@ -147,10 +181,4 @@ object ServiceLocator {
     // Expose TokenManager publicly
     fun provideTokenManager(context: Context): TokenManager =
         getTokenManager(context)
-
-    fun provideDatabaseHelper(context: Context): DatabaseHelper {
-        return databaseHelper ?: synchronized(this) {
-            databaseHelper ?: DatabaseHelper(context.applicationContext).also { databaseHelper = it }
-        }
-    }
 }

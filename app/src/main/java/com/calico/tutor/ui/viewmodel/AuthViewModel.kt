@@ -14,13 +14,10 @@ import com.calico.tutor.domain.usecase.RegisterUseCase
 import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 import com.calico.tutor.domain.usecase.ClearTokenUseCase
 import com.calico.tutor.domain.utils.Result
-import com.calico.tutor.util.EmailValidator
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -33,17 +30,12 @@ class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
     private val getAuthTokenUseCase: GetAuthTokenUseCase,
-    private val context: Context
     private val googleLoginUseCase: GoogleLoginUseCase,
     private val clearTokenUseCase: ClearTokenUseCase
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
-
-    init {
-        checkAuthStatus()
-    }
 
     private val retryQueue = RetryQueue()
 
@@ -220,12 +212,6 @@ class AuthViewModel(
         _authState.value = AuthState.Idle
     }
 
-    fun logout() {
-        val tokenManager = ServiceLocator.provideTokenManager(context)
-        tokenManager.clearToken()
-        _authState.value = AuthState.Idle
-    }
-
     fun getPendingRetries(): Int = retryQueue.getPendingRequests()
 
     private fun isNetworkRelated(exception: Throwable): Boolean {
@@ -237,7 +223,7 @@ class AuthViewModel(
     }
 }
 
-class AuthViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
+class AuthViewModelFactory(context: Context) : ViewModelProvider.Factory {
     private val loginUseCase = ServiceLocator.loginUseCase(context)
     private val registerUseCase = ServiceLocator.registerUseCase(context)
     private val getAuthTokenUseCase = ServiceLocator.getAuthTokenUseCase(context)
@@ -251,7 +237,6 @@ class AuthViewModelFactory(private val context: Context) : ViewModelProvider.Fac
                 loginUseCase = loginUseCase,
                 registerUseCase = registerUseCase,
                 getAuthTokenUseCase = getAuthTokenUseCase,
-                context = context
                 googleLoginUseCase = googleLoginUseCase,
                 clearTokenUseCase = clearTokenUseCase
             ) as T

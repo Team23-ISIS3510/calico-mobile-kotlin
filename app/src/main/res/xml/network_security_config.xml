@@ -6,9 +6,8 @@
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.50.0.253</domain>
+        <domain includeSubdomains="true">10.50.0.108</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">yuup.it</domain>
     </domain-config>
 </network-security-config>

@@ -30,6 +30,7 @@ import com.calico.tutor.ui.theme.PrimaryOrange
 import com.calico.tutor.ui.viewmodel.AvailabilityActionState
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModel
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModelFactory
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -78,7 +79,14 @@ fun CreateAvailabilityScreen(
 
     LaunchedEffect(actionState) {
         when (val s = actionState) {
-            is AvailabilityActionState.Done -> { vm.resetActionState(); onNavigateBack() }
+            is AvailabilityActionState.Done -> {
+                vm.consumePendingActionMessage()?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    delay(350)
+                }
+                vm.resetActionState()
+                onNavigateBack()
+            }
             is AvailabilityActionState.Error -> {
                 Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
                 vm.resetActionState()
