@@ -1,20 +1,24 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.calico.tutor.data.dto.response.AllCoursesResponse
 import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.data.dto.response.CourseApplicationResponse
 import com.calico.tutor.data.dto.response.TutorCourseData
+import com.calico.tutor.data.datasource.remote.ApplyCourseRequest
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.screen.DatabaseHelper
+import com.calico.tutor.util.ApiResponseCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.ConnectException
 import android.util.Log
 
 sealed class CoursesState {
@@ -23,7 +27,10 @@ sealed class CoursesState {
     data class Success(
         val approvedCourses: List<TutorCourseData>,
         val availableCourses: List<AvailableCourseResponse>,
-        val applications: List<CourseApplicationResponse>
+        val applications: List<CourseApplicationResponse>,
+        val pendingApplications: List<DatabaseHelper.PendingApplication> = emptyList(),
+        val isOffline: Boolean = false,
+        val applicationQueued: Boolean = false
     ) : CoursesState()
     data class Error(val message: String) : CoursesState()
 }
@@ -36,23 +43,128 @@ class CoursesViewModel(
     private val _coursesState = MutableStateFlow<CoursesState>(CoursesState.Idle)
     val coursesState: StateFlow<CoursesState> = _coursesState.asStateFlow()
 
+    private val _isApplying = MutableStateFlow(false)
+    private val _applicationQueued = MutableStateFlow(false)
+    val applicationQueued: StateFlow<Boolean> = _applicationQueued.asStateFlow()
+    val isApplying: StateFlow<Boolean> = _isApplying.asStateFlow()
+
     private val subjectsApiService by lazy { ServiceLocator.subjectsApiService(context) }
 
-    fun loadData(tutorId: String) {
+    private val approvedCoursesCache = ApiResponseCache.approvedCourses()
+    private val applicationsCache = ApiResponseCache.applications()
+    private val allCoursesCache = ApiResponseCache.allCourses()
+
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    fun loadData(tutorId: String, preservePending: Boolean = false) {
         viewModelScope.launch {
-            _coursesState.value = CoursesState.Loading
+            // If not preserving state, show loading
+            if (!preservePending) {
+                _coursesState.value = CoursesState.Loading
+            }
+
+            val hasNetwork = isNetworkAvailable()
+            Log.d("CoursesViewModel", "Network available: $hasNetwork, preservePending: $preservePending")
+
+            // If no network, go directly to offline mode
+            if (!hasNetwork) {
+                loadFromCache(tutorId, isOffline = true, preservePending = preservePending)
+                return@launch
+            }
 
             try {
                 Log.d("CoursesViewModel", "Fetching from API for tutor: $tutorId")
 
-                val approvedCourses = withContext(Dispatchers.IO) {
-                    subjectsApiService.getTutorCourses(tutorId)
+                // Try API - if it fails, will catch below
+                var approvedCourses: List<TutorCourseData> = emptyList()
+                var applications: List<CourseApplicationResponse> = emptyList()
+                var allCoursesResponse: AllCoursesResponse = AllCoursesResponse()
+
+                try {
+                    approvedCourses = withContext(Dispatchers.IO) {
+                        subjectsApiService.getTutorCourses(tutorId)
+                    }
+                    approvedCoursesCache.put("approved_$tutorId", approvedCourses)
+                    Log.d("CoursesViewModel", "✅ API: approved courses loaded (${approvedCourses.size})")
+                } catch (e: Exception) {
+                    Log.w("CoursesViewModel", "❌ API failed for approved: ${e.message}")
+                    val cached = approvedCoursesCache.get("approved_$tutorId")
+                    approvedCourses = (cached as? List<TutorCourseData>) ?: emptyList()
+                    if (approvedCourses.isEmpty()) {
+                        approvedCourses = withContext(Dispatchers.IO) {
+                            dbHelper.getApprovedCourses().map { course ->
+                                TutorCourseData(
+                                    id = course.id.toString(),
+                                    name = course.title,
+                                    code = course.description ?: "",
+                                    credits = course.category?.toIntOrNull() ?: 0
+                                )
+                            }
+                        }
+                    }
                 }
-                val applications = withContext(Dispatchers.IO) {
-                    subjectsApiService.getTutorApplications(tutorId)
+
+                try {
+                    applications = withContext(Dispatchers.IO) {
+                        subjectsApiService.getTutorApplications(tutorId)
+                    }
+                    applicationsCache.put("apps_$tutorId", applications)
+                    Log.d("CoursesViewModel", "✅ API: applications loaded (${applications.size})")
+                } catch (e: Exception) {
+                    Log.w("CoursesViewModel", "❌ API failed for applications: ${e.message}")
+                    val cached = applicationsCache.get("apps_$tutorId")
+                    applications = (cached as? List<CourseApplicationResponse>) ?: emptyList()
+                    if (applications.isEmpty()) {
+                        applications = withContext(Dispatchers.IO) {
+                            try {
+                                dbHelper.getApplications().map { app ->
+                                    CourseApplicationResponse(
+                                        id = app.id.toString(),
+                                        courseId = app.courseId,
+                                        courseName = app.courseName,
+                                        courseCode = app.courseCode,
+                                        status = app.status,
+                                        rejectionReason = app.rejectionReason
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+                        }
+                    }
                 }
-                val allCoursesResponse = withContext(Dispatchers.IO) {
-                    subjectsApiService.getAllAvailableCourses()
+
+                try {
+                    allCoursesResponse = withContext(Dispatchers.IO) {
+                        subjectsApiService.getAllAvailableCourses()
+                    }
+                    allCoursesCache.put("all", allCoursesResponse)
+                    Log.d("CoursesViewModel", "✅ API: all courses loaded (${allCoursesResponse.courses.size})")
+                } catch (e: Exception) {
+                    Log.w("CoursesViewModel", "❌ API failed for all courses: ${e.message}")
+                    val cached = allCoursesCache.get("all")
+                    allCoursesResponse = cached as? AllCoursesResponse ?: AllCoursesResponse()
+                    if (allCoursesResponse.courses.isEmpty()) {
+                        allCoursesResponse = withContext(Dispatchers.IO) {
+                            val localCourses = dbHelper.getCourses()
+                            val courseList = localCourses.map { course ->
+                                AvailableCourseResponse(
+                                    id = course.id.toString(),
+                                    name = course.title,
+                                    code = course.description ?: "",
+                                    credits = 0,
+                                    faculty = course.category,
+                                    hasApplied = false
+                                )
+                            }
+                            AllCoursesResponse(courses = courseList)
+                        }
+                    }
                 }
 
                 val allAvailableCourses = allCoursesResponse.courses
@@ -66,7 +178,7 @@ class CoursesViewModel(
                     approvedCourses.none { approved -> approved.id == available.id }
                 }
 
-                // Only save available courses (exclude approved)
+                // Cache to SQLite for offline
                 val coursesToCache = availableCourses.map { course ->
                     DatabaseHelper.Course(
                         title = course.name,
@@ -96,129 +208,241 @@ class CoursesViewModel(
                     dbHelper.saveApplications(applicationsToCache)
                 }
 
+                // Load pending applications (wrapped in try-catch for backwards compatibility)
+                val pendingApps = try {
+                    withContext(Dispatchers.IO) {
+                        dbHelper.getPendingApplications()
+                    }
+                } catch (e: Exception) {
+                    Log.w("CoursesViewModel", "Pending applications table not available: ${e.message}")
+                    emptyList()
+                }
+
+                // Try to sync pending applications if online
+                if (hasNetwork && pendingApps.isNotEmpty()) {
+                    syncPendingApplications(tutorId, pendingApps)
+                }
+
+                // Preserve existing pending apps if doing background refresh
+                val finalPendingApps = if (preservePending && _coursesState.value is CoursesState.Success) {
+                    val existingPending = (_coursesState.value as CoursesState.Success).pendingApplications
+                    val newPendingIds = pendingApps.map { it.courseId }.toSet()
+                    existingPending + pendingApps.filter { it.courseId !in newPendingIds }
+                } else {
+                    pendingApps
+                }
+
                 _coursesState.value = CoursesState.Success(
                     approvedCourses = approvedCourses,
                     availableCourses = availableCourses,
-                    applications = applications
+                    applications = applications,
+                    pendingApplications = finalPendingApps,
+                    isOffline = false
                 )
 
                 Log.d("CoursesViewModel", "Loaded: ${approvedCourses.size} approved, ${availableCourses.size} available")
 
-            } catch (e: ConnectException) {
-                Log.w("CoursesViewModel", "Connection failed, falling back to local cache")
-
-                val localCourses = withContext(Dispatchers.IO) {
-                    dbHelper.getCourses()
-                }
-                val localApproved = withContext(Dispatchers.IO) {
-                    dbHelper.getApprovedCourses()
-                }
-                val localApplications = try {
-                    withContext(Dispatchers.IO) {
-                        dbHelper.getApplications()
-                    }
-                } catch (e: Exception) {
-                    Log.w("CoursesViewModel", "No applications table: ${e.message}")
-                    emptyList()
-                }
-
-                Log.d("CoursesViewModel", "Cache: ${localCourses.size} available, ${localApproved.size} approved")
-
-                // If no cached data at all, show error
-                if (localCourses.isEmpty() && localApproved.isEmpty()) {
-                    _coursesState.value = CoursesState.Error("No cached data. Connect to internet.")
-                    return@launch
-                }
-
-                val localApprovedCourses = localApproved.map { course ->
-                    TutorCourseData(
-                        id = course.id.toString(),
-                        name = course.title,
-                        code = course.description ?: "",
-                        credits = course.category?.toIntOrNull() ?: 0
-                    )
-                }
-
-                val approvedIds = localApproved.map { it.title }.toSet()
-                val filteredAvailable = localCourses.filter { course -> course.title !in approvedIds }
-
-                val localAvailableCourses = filteredAvailable.map { course ->
-                    val hasApp = localApplications.any { it.courseName == course.title && it.status == "pending" }
-                    AvailableCourseResponse(
-                        id = course.id.toString(),
-                        name = course.title,
-                        code = course.description ?: "",
-                        credits = 0,
-                        faculty = course.category,
-                        hasApplied = hasApp
-                    )
-                }
-
-                val localApplicationsList = localApplications.map { app ->
-                    CourseApplicationResponse(
-                        id = app.id.toString(),
-                        courseId = app.courseId,
-                        courseName = app.courseName,
-                        courseCode = app.courseCode,
-                        status = app.status,
-                        rejectionReason = app.rejectionReason
-                    )
-                }
-
-                _coursesState.value = CoursesState.Success(
-                    approvedCourses = localApprovedCourses,
-                    availableCourses = localAvailableCourses,
-                    applications = localApplicationsList
-                )
-
-                Log.d("CoursesViewModel", "Loaded from cache: ${filteredAvailable.size} available, ${localApproved.size} approved, ${localApplications.size} apps")
-
             } catch (e: Exception) {
                 Log.e("CoursesViewModel", "Error loading data: ${e.message}", e)
 
-                val localCourses = withContext(Dispatchers.IO) {
-                    dbHelper.getCourses()
-                }
-                val localApproved = withContext(Dispatchers.IO) {
-                    dbHelper.getApprovedCourses()
-                }
-
-                Log.d("CoursesViewModel", "Cache fallback: ${localCourses.size} available, ${localApproved.size} approved")
-
-                if (localCourses.isEmpty() && localApproved.isEmpty()) {
-                    _coursesState.value = CoursesState.Error("Error: ${e.message}")
+                // Check if we have network - if not, try offline
+                if (!isNetworkAvailable()) {
+                    loadFromCache(tutorId, isOffline = true)
                     return@launch
                 }
 
-                val localApprovedCourses = localApproved.map { course ->
-                    TutorCourseData(
-                        id = course.id.toString(),
-                        name = course.title,
-                        code = course.description ?: "",
-                        credits = course.category?.toIntOrNull() ?: 0
-                    )
-                }
-
-                val approvedIds = localApproved.map { it.title }.toSet()
-                val filteredAvailable = localCourses.filter { course -> course.title !in approvedIds }
-
-                val localAvailableCourses = filteredAvailable.map { course ->
-                    AvailableCourseResponse(
-                        id = course.id.toString(),
-                        name = course.title,
-                        code = course.description ?: "",
-                        credits = 0,
-                        faculty = course.category,
-                        hasApplied = false
-                    )
-                }
-
-                _coursesState.value = CoursesState.Success(
-                    approvedCourses = localApprovedCourses,
-                    availableCourses = localAvailableCourses,
-                    applications = emptyList()
-                )
+                loadFromCache(tutorId, isOffline = true)
             }
         }
+    }
+
+    private suspend fun loadFromCache(tutorId: String, isOffline: Boolean, preservePending: Boolean = false) {
+        val localCourses = withContext(Dispatchers.IO) { dbHelper.getCourses() }
+        val localApproved = withContext(Dispatchers.IO) { dbHelper.getApprovedCourses() }
+        val localApplications = try {
+            withContext(Dispatchers.IO) { dbHelper.getApplications() }
+        } catch (e: Exception) {
+            Log.w("CoursesViewModel", "No applications table: ${e.message}")
+            emptyList()
+        }
+
+        Log.d("CoursesViewModel", "Cache: ${localCourses.size} available, ${localApproved.size} approved")
+
+        if (localCourses.isEmpty() && localApproved.isEmpty()) {
+            _coursesState.value = CoursesState.Error("No data available. Connect to internet.")
+            return
+        }
+
+        val localApprovedCourses = localApproved.map { course ->
+            TutorCourseData(
+                id = course.id.toString(),
+                name = course.title,
+                code = course.description ?: "",
+                credits = course.category?.toIntOrNull() ?: 0
+            )
+        }
+
+        val approvedIds = localApproved.map { it.title }.toSet()
+        val filteredAvailable = localCourses.filter { course -> course.title !in approvedIds }
+
+        val localAvailableCourses = filteredAvailable.map { course ->
+            val hasApp = localApplications.any { it.courseName == course.title && it.status == "pending" }
+            AvailableCourseResponse(
+                id = course.id.toString(),
+                name = course.title,
+                code = course.description ?: "",
+                credits = 0,
+                faculty = course.category,
+                hasApplied = hasApp
+            )
+        }
+
+        val localApplicationsList = localApplications.map { app ->
+            CourseApplicationResponse(
+                id = app.id.toString(),
+                courseId = app.courseId,
+                courseName = app.courseName,
+                courseCode = app.courseCode,
+                status = app.status,
+                rejectionReason = app.rejectionReason
+            )
+        }
+
+        // Load pending applications (wrapped in try-catch for backwards compatibility)
+        val pendingApps = try {
+            withContext(Dispatchers.IO) {
+                dbHelper.getPendingApplications()
+            }
+        } catch (e: Exception) {
+            Log.w("CoursesViewModel", "Pending applications table not available: ${e.message}")
+            emptyList()
+        }
+
+        // Preserve existing pending apps if doing background refresh
+        val finalPendingApps = if (preservePending) {
+            val existingPending = (_coursesState.value as? CoursesState.Success)?.pendingApplications ?: emptyList()
+            val newPendingIds = pendingApps.map { it.courseId }.toSet()
+            existingPending + pendingApps.filter { it.courseId !in newPendingIds }
+        } else {
+            pendingApps
+        }
+
+        _coursesState.value = CoursesState.Success(
+            approvedCourses = localApprovedCourses,
+            availableCourses = localAvailableCourses,
+            applications = localApplicationsList,
+            pendingApplications = finalPendingApps,
+            isOffline = isOffline
+        )
+
+        Log.d("CoursesViewModel", "Loaded from cache: ${filteredAvailable.size} available, ${localApproved.size} approved, ${finalPendingApps.size} pending")
+    }
+
+    private suspend fun syncPendingApplications(tutorId: String, pendingApps: List<DatabaseHelper.PendingApplication>) {
+        val successfulIds = mutableListOf<Long>()
+        
+        for (app in pendingApps) {
+            try {
+                val request = ApplyCourseRequest(
+                    tutorId = tutorId,
+                    courseId = app.courseId,
+                    notes = app.notes
+                )
+                withContext(Dispatchers.IO) {
+                    subjectsApiService.applyForCourse(request)
+                }
+                // Remove from DB on success
+                withContext(Dispatchers.IO) {
+                    dbHelper.deletePendingApplication(app.id)
+                }
+                successfulIds.add(app.id)
+                Log.d("CoursesViewModel", "✅ Synced pending application: ${app.courseName}")
+            } catch (e: Exception) {
+                Log.w("CoursesViewModel", "❌ Failed to sync application: ${app.courseName} - ${e.message}")
+            }
+        }
+        
+        if (successfulIds.isNotEmpty()) {
+            Log.d("CoursesViewModel", "Synced ${successfulIds.size} pending applications")
+            // Clear applications cache to force refresh
+            applicationsCache.remove("apps_$tutorId")
+            // Reload to get fresh API data without preserved pending
+            loadData(tutorId, preservePending = false)
+        }
+    }
+
+    fun applyForCourse(tutorId: String, courseId: String, courseName: String, courseCode: String, notes: String?) {
+        viewModelScope.launch {
+            _isApplying.value = true
+            
+            val hasNetwork = isNetworkAvailable()
+            Log.d("CoursesViewModel", "Network available for application: $hasNetwork")
+            
+            if (!hasNetwork) {
+                // Queue the application for later
+                try {
+                    val pendingApp = DatabaseHelper.PendingApplication(
+                        courseId = courseId,
+                        courseName = courseName,
+                        courseCode = courseCode,
+                        notes = notes,
+                        createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).format(java.util.Date())
+                    )
+                    withContext(Dispatchers.IO) {
+                        dbHelper.savePendingApplication(pendingApp)
+                    }
+                    Log.d("CoursesViewModel", "Application queued for later: $courseName")
+                    
+                    // Update UI immediately without waiting for loadData
+                    val currentState = _coursesState.value
+                    if (currentState is CoursesState.Success) {
+                        val updatedPendingApps = currentState.pendingApplications + pendingApp.copy(id = System.currentTimeMillis())
+                        _coursesState.value = currentState.copy(pendingApplications = updatedPendingApps)
+                    }
+                    
+                    // Reload in background to refresh from DB
+                    loadData(tutorId, preservePending = true)
+                    
+                    // Set flag to close dialog
+                    _applicationQueued.value = true
+                } catch (e: Exception) {
+                    Log.e("CoursesViewModel", "Failed to queue application: ${e.message}")
+                } finally {
+                    _isApplying.value = false
+                }
+                return@launch
+            }
+
+            // Online - submit directly
+            try {
+                val request = ApplyCourseRequest(
+                    tutorId = tutorId,
+                    courseId = courseId,
+                    notes = notes
+                )
+                val result = withContext(Dispatchers.IO) {
+                    subjectsApiService.applyForCourse(request)
+                }
+                Log.d("CoursesViewModel", "Application submitted: $result")
+
+                // Clear caches so next load fetches fresh data
+                applicationsCache.remove("apps_$tutorId")
+
+                // Reload data to reflect the new application
+                loadData(tutorId)
+                
+                // Set flag to close dialog
+                _applicationQueued.value = true
+
+            } catch (e: Exception) {
+                Log.e("CoursesViewModel", "Error applying for course: ${e.message}", e)
+            } finally {
+                _isApplying.value = false
+            }
+        }
+    }
+    
+    fun resetApplicationQueued() {
+        _applicationQueued.value = false
     }
 }

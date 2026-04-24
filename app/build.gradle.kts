@@ -112,6 +112,9 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.java.jwt)
 
+    // Image Loading
+    implementation(libs.coil.compose)
+
     // Lifecycle & ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -15,6 +15,12 @@ import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
+import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.viewmodel.ProfileViewModel
+import com.calico.tutor.util.JwtUtils
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
@@ -115,7 +121,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                                     tutorId = firebaseUid ?: email,
                                     context = context,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     },
                                     onNavigateToTopSubjects = {
                                         setCurrentScreen("topSubjects")
@@ -141,11 +147,11 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                                 StatisticsScreen()
                             }
                             "profile" -> {
+                                val profileViewModel = remember { ProfileViewModel(context) }
                                 ProfileScreen(
-                                    userName = userName,
-                                    userEmail = email ?: "",
+                                    viewModel = profileViewModel,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     }
                                 )
                             }
@@ -155,7 +161,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                                     tutorId = firebaseUid ?: email,
                                     context = context,
                                     onLogout = {
-                                        viewModel.resetState()
+                                        viewModel.logout()
                                     },
                                     onNavigateToTopSubjects = {
                                         setCurrentScreen("topSubjects")
@@ -270,7 +276,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     },
                     onBackClick = {
                         setShowLogin(true)
-                        viewModel.resetState()
+                        viewModel.logout()
                     },
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
