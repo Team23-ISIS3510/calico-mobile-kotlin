@@ -125,4 +125,10 @@ dependencies {
 
     // Google Play Services for Google Sign-In
     implementation(libs.google.play.services.auth)
+
+    // WorkManager
+    implementation(libs.work.runtime.ktx)
+
+    // DataStore Preferences
+    implementation(libs.datastore.preferences)
 }

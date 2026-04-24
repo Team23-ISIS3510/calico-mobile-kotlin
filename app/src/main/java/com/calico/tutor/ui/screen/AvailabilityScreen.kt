@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,8 +74,9 @@ fun AvailabilityScreen(
         key = "availability_$tutorId",
         factory = AvailabilityViewModelFactory(context, tutorId)
     )
-    val listState by vm.listState.collectAsState()
-    val actionState by vm.actionState.collectAsState()
+    val listState    by vm.listState.collectAsState()
+    val actionState  by vm.actionState.collectAsState()
+    val pendingCount by vm.pendingCount.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
     var createStep by remember { mutableStateOf(0) }
@@ -134,6 +136,31 @@ fun AvailabilityScreen(
             }
 
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+
+            // Badge de sincronizaciones pendientes (Eventual Connectivity)
+            if (pendingCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFF3E0))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = null,
+                        tint = PrimaryOrange,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "$pendingCount disponibilidad(es) pendiente(s) de sincronizar",
+                        color = PrimaryOrange,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
             when (selectedTab) {
                 0 -> SeeAvailabilitiesTab(listState, vm, onNavigateToEdit)
