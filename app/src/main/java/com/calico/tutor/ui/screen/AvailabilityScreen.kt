@@ -18,10 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +47,7 @@ import com.calico.tutor.ui.viewmodel.AvailabilityActionState
 import com.calico.tutor.ui.viewmodel.AvailabilityListState
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModel
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModelFactory
+import com.calico.tutor.ui.viewmodel.OfflineBannerState
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
@@ -74,9 +77,9 @@ fun AvailabilityScreen(
         key = "availability_$tutorId",
         factory = AvailabilityViewModelFactory(context, tutorId)
     )
-    val listState    by vm.listState.collectAsState()
-    val actionState  by vm.actionState.collectAsState()
-    val pendingCount by vm.pendingCount.collectAsState()
+    val listState   by vm.listState.collectAsState()
+    val actionState by vm.actionState.collectAsState()
+    val bannerState by vm.bannerState.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
     var createStep by remember { mutableStateOf(0) }
@@ -87,22 +90,13 @@ fun AvailabilityScreen(
     var repeatOption by remember { mutableStateOf(RepeatOption.NONE) }
     var showRepeatSheet by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) { vm.startConnectivityMonitoring() }
+
     LaunchedEffect(actionState) {
         when (val s = actionState) {
             is AvailabilityActionState.Error -> {
                 Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
                 vm.resetActionState()
-            }
-            is AvailabilityActionState.OfflineSaved -> {
-                Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
-                vm.resetActionState()
-                selectedTab = 0
-                createStep = 0
-                selectedDate = ""
-                selectedStartTime = START_TIME_SLOTS[0]
-                selectedEndTime = END_TIME_SLOTS[1]
-                title = ""
-                repeatOption = RepeatOption.NONE
             }
             is AvailabilityActionState.Done -> {
                 vm.resetActionState()
@@ -148,29 +142,11 @@ fun AvailabilityScreen(
 
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
 
-            // Badge de sincronizaciones pendientes (Eventual Connectivity)
-            if (pendingCount > 0) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFFF3E0))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = null,
-                        tint = PrimaryOrange,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "$pendingCount disponibilidad(es) pendiente(s) de sincronizar",
-                        color = PrimaryOrange,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+            // Offline / sync status banner (Eventual Connectivity)
+            when (val banner = bannerState) {
+                is OfflineBannerState.PendingSync -> OfflinePendingBanner(banner.count)
+                is OfflineBannerState.SyncDone    -> SyncDoneBanner(banner.syncedCount)
+                is OfflineBannerState.Hidden      -> {}
             }
 
             when (selectedTab) {
@@ -627,6 +603,58 @@ private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelet
                 IconButton(onClick = { showDialog = true }) { Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFE53935)) }
             }
         }
+    }
+}
+
+@Composable
+private fun OfflinePendingBanner(count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFFFF3E0))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.WifiOff,
+            contentDescription = null,
+            tint = PrimaryOrange,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "No internet connection. $count ${if (count == 1) "availability" else "availabilities"} pending to sync.",
+            color = PrimaryOrange,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun SyncDoneBanner(syncedCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFE8F5E9))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = Color(0xFF2E7D32),
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "Connection restored. $syncedCount ${if (syncedCount == 1) "availability" else "availabilities"} synchronized.",
+            color = Color(0xFF2E7D32),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

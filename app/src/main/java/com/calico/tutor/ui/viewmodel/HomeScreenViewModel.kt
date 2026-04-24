@@ -226,16 +226,6 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // BQ15 TELEMETRY: homepage load time
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Call when the Home composable enters composition (before data loads). */
-    fun onHomepageOpened() {
-        homepageLoadStartMs  = System.currentTimeMillis()
-        homepageLoadReported = false
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     // FETCH HELPERS — se ejecutan en Dispatchers.IO via async(IO)
     // ─────────────────────────────────────────────────────────────────────────
 

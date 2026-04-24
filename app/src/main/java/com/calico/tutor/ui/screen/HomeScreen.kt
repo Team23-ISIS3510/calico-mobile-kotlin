@@ -62,14 +62,7 @@ fun HomeScreen(
 
     LaunchedEffect(sessionsState, subjectsState) {
         vm.onHomepageContentRendered(
-            isSessionsReady   = sessionsState is SessionsState.Success,
-            isTopSubjectsReady = subjectsState is SubjectsState.Success
-        )
-    }
-
-    LaunchedEffect(sessionsState, subjectsState) {
-        vm.onHomepageContentRendered(
-            isSessionsReady = sessionsState is SessionsState.Success,
+            isSessionsReady    = sessionsState is SessionsState.Success,
             isTopSubjectsReady = subjectsState is SubjectsState.Success
         )
     }
