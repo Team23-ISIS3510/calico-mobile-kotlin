@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import com.calico.tutor.domain.model.AvailabilityItem
 import com.calico.tutor.ui.component.BottomNavBar
 import com.calico.tutor.ui.component.NavBarItem
+import com.calico.tutor.ui.viewmodel.CoursesViewModel
 import com.calico.tutor.ui.viewmodel.ProfileViewModel
 
 @Composable
@@ -79,7 +80,8 @@ fun MainScreen(
                         )
                         "courses" -> CoursesScreen(
                             tutorId = tutorId,
-                            context = context
+                            context = context,
+                            viewModel = remember { CoursesViewModel(context, DatabaseHelper(context)) }
                         )
                         "availability" -> AvailabilityScreen(
                             context = context,

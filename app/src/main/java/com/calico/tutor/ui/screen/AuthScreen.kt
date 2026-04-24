@@ -15,6 +15,7 @@ import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
+import com.calico.tutor.util.JwtUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
@@ -127,10 +128,14 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             val userName = email
                 .substringBefore("@")
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            
+            // Extract Firebase UID from token for proper tutor ID
+            val firebaseUid = JwtUtils.extractFirebaseUid(state.token.idToken)
+            val tutorId = firebaseUid ?: email
 
             MainScreen(
                 userName = userName,
-                tutorId = email,
+                tutorId = tutorId,
                 userEmail = email,
                 context = context,
                 onLogout = { viewModel.resetState() }

@@ -11,7 +11,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "app_database.db"
-        private const val DATABASE_VERSION = 4
+        private const val DATABASE_VERSION = 5
 
         const val TABLE_COURSES = "courses"
         const val TABLE_APPROVED_COURSES = "approved_courses"
@@ -31,6 +31,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private val CREATE_TABLE_COURSES = (
             "CREATE TABLE $TABLE_COURSES ("
             + "$COLUMN_COURSE_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+            + "api_id TEXT, "
             + "$COLUMN_COURSE_TITLE TEXT NOT NULL, "
             + "$COLUMN_COURSE_DESCRIPTION TEXT, "
             + "$COLUMN_COURSE_CATEGORY TEXT"
@@ -105,6 +106,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             db.delete(TABLE_COURSES, null, null)
             for (course in courses) {
                 val values = ContentValues().apply {
+                    put("api_id", course.apiId)
                     put(COLUMN_COURSE_TITLE, course.title)
                     put(COLUMN_COURSE_DESCRIPTION, course.description)
                     put(COLUMN_COURSE_CATEGORY, course.category)
@@ -133,8 +135,11 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
 
         cursor?.use {
             while (it.moveToNext()) {
+                val apiIdCol = it.getColumnIndex("api_id")
+                val apiId = if (apiIdCol >= 0) it.getString(apiIdCol) else null
                 val course = Course(
                     id = it.getLong(it.getColumnIndexOrThrow(COLUMN_COURSE_ID)),
+                    apiId = apiId,
                     title = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_TITLE)),
                     description = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_DESCRIPTION)),
                     category = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_CATEGORY))
@@ -206,6 +211,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
 
     data class Course(
         val id: Long = 0,
+        val apiId: String? = null,
         val title: String,
         val description: String? = null,
         val category: String? = null

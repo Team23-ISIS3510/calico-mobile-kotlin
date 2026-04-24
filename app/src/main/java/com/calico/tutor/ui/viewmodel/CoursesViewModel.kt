@@ -77,10 +77,27 @@ class CoursesViewModel(
                 return@launch
             }
 
+            // Always try to sync pending applications when coming online
+            val pendingAppsFromDb = try {
+                withContext(Dispatchers.IO) {
+                    dbHelper.getPendingApplications()
+                }
+            } catch (e: Exception) {
+                Log.w("CoursesViewModel", "Pending apps table error: ${e.message}")
+                emptyList()
+            }
+            
+            if (pendingAppsFromDb.isNotEmpty()) {
+                Log.d("CoursesViewModel", "Found ${pendingAppsFromDb.size} pending apps to sync")
+                syncPendingApplications(tutorId, pendingAppsFromDb)
+                // After sync, loadData will be called again from syncPendingApplications
+                return@launch
+            }
+
             try {
                 Log.d("CoursesViewModel", "Fetching from API for tutor: $tutorId")
 
-                // Try API - if it fails, will catch below
+                // ALWAYS try API first - no cache fallback for main data
                 var approvedCourses: List<TutorCourseData> = emptyList()
                 var applications: List<CourseApplicationResponse> = emptyList()
                 var allCoursesResponse: AllCoursesResponse = AllCoursesResponse()
@@ -89,12 +106,15 @@ class CoursesViewModel(
                     approvedCourses = withContext(Dispatchers.IO) {
                         subjectsApiService.getTutorCourses(tutorId)
                     }
+                    // Only cache after successful API call
                     approvedCoursesCache.put("approved_$tutorId", approvedCourses)
                     Log.d("CoursesViewModel", "✅ API: approved courses loaded (${approvedCourses.size})")
                 } catch (e: Exception) {
-                    Log.w("CoursesViewModel", "❌ API failed for approved: ${e.message}")
+                    Log.e("CoursesViewModel", "❌ API failed for approved: ${e.message}", e)
+                    // Try LRU cache
                     val cached = approvedCoursesCache.get("approved_$tutorId")
                     approvedCourses = (cached as? List<TutorCourseData>) ?: emptyList()
+                    // If still empty, try DB
                     if (approvedCourses.isEmpty()) {
                         approvedCourses = withContext(Dispatchers.IO) {
                             dbHelper.getApprovedCourses().map { course ->
@@ -181,6 +201,7 @@ class CoursesViewModel(
                 // Cache to SQLite for offline
                 val coursesToCache = availableCourses.map { course ->
                     DatabaseHelper.Course(
+                        apiId = course.id,
                         title = course.name,
                         description = course.code,
                         category = course.faculty
@@ -288,7 +309,7 @@ class CoursesViewModel(
         val localAvailableCourses = filteredAvailable.map { course ->
             val hasApp = localApplications.any { it.courseName == course.title && it.status == "pending" }
             AvailableCourseResponse(
-                id = course.id.toString(),
+                id = course.apiId ?: course.id.toString(),
                 name = course.title,
                 code = course.description ?: "",
                 credits = 0,
@@ -363,11 +384,70 @@ class CoursesViewModel(
         }
         
         if (successfulIds.isNotEmpty()) {
-            Log.d("CoursesViewModel", "Synced ${successfulIds.size} pending applications")
-            // Clear applications cache to force refresh
+            Log.d("CoursesViewModel", "Synced ${successfulIds.size} pending applications, re-fetching API data")
+            // Clear caches and fetch fresh data from API (don't preserve pending)
             applicationsCache.remove("apps_$tutorId")
-            // Reload to get fresh API data without preserved pending
-            loadData(tutorId, preservePending = false)
+            approvedCoursesCache.remove("approved_$tutorId")
+            allCoursesCache.remove("all")
+            
+            // Fetch fresh data - this will NOT trigger sync again since DB is now empty
+            fetchAndUpdateData(tutorId)
+        }
+    }
+    
+    private suspend fun fetchAndUpdateData(tutorId: String) {
+        try {
+            var approvedCourses: List<TutorCourseData> = emptyList()
+            var applications: List<CourseApplicationResponse> = emptyList()
+            var allCoursesResponse: AllCoursesResponse = AllCoursesResponse()
+
+            try {
+                approvedCourses = withContext(Dispatchers.IO) {
+                    subjectsApiService.getTutorCourses(tutorId)
+                }
+                approvedCoursesCache.put("approved_$tutorId", approvedCourses)
+            } catch (e: Exception) {
+                Log.e("CoursesViewModel", "Error fetching approved courses: ${e.message}")
+            }
+
+            try {
+                applications = withContext(Dispatchers.IO) {
+                    subjectsApiService.getTutorApplications(tutorId)
+                }
+                applicationsCache.put("apps_$tutorId", applications)
+            } catch (e: Exception) {
+                Log.e("CoursesViewModel", "Error fetching applications: ${e.message}")
+            }
+
+            try {
+                allCoursesResponse = withContext(Dispatchers.IO) {
+                    subjectsApiService.getAllAvailableCourses()
+                }
+                allCoursesCache.put("all", allCoursesResponse)
+            } catch (e: Exception) {
+                Log.e("CoursesViewModel", "Error fetching all courses: ${e.message}")
+            }
+
+            // Filter out courses that already have pending or approved applications
+            val appliedCourseIds = applications.map { it.courseId }.toSet()
+            val availableCourses = allCoursesResponse.courses.filter { course ->
+                val isApproved = approvedCourses.any { it.id == course.id }
+                val hasApplication = appliedCourseIds.contains(course.id)
+                !isApproved && !hasApplication
+            }.map { course ->
+                course.copy(hasApplied = false)
+            }
+
+            _coursesState.value = CoursesState.Success(
+                approvedCourses = approvedCourses,
+                availableCourses = availableCourses,
+                applications = applications,
+                pendingApplications = emptyList(), // DB is now empty after sync
+                isOffline = false
+            )
+            Log.d("CoursesViewModel", "✅ Fresh data loaded after sync: ${approvedCourses.size} approved, ${availableCourses.size} available")
+        } catch (e: Exception) {
+            Log.e("CoursesViewModel", "Error fetching fresh data: ${e.message}")
         }
     }
 
@@ -425,8 +505,10 @@ class CoursesViewModel(
                 }
                 Log.d("CoursesViewModel", "Application submitted: $result")
 
-                // Clear caches so next load fetches fresh data
+                // Clear caches to force fresh data from API
                 applicationsCache.remove("apps_$tutorId")
+                approvedCoursesCache.remove("approved_$tutorId")
+                allCoursesCache.remove("all")
 
                 // Reload data to reflect the new application
                 loadData(tutorId)
