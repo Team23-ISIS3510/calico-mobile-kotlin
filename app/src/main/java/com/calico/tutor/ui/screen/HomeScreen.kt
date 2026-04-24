@@ -67,6 +67,13 @@ fun HomeScreen(
         )
     }
 
+    LaunchedEffect(sessionsState, subjectsState) {
+        vm.onHomepageContentRendered(
+            isSessionsReady = sessionsState is SessionsState.Success,
+            isTopSubjectsReady = subjectsState is SubjectsState.Success
+        )
+    }
+
     val displayName = tutorName.ifBlank { userName }
 
     Box(

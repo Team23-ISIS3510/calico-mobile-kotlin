@@ -106,19 +106,41 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     private val userPrefs    = ServiceLocator.userPreferences(context)
     private val memoryCache  = ServiceLocator.inMemoryCache()
     private val fileManager  = ServiceLocator.fileManager(context)
+    private val telemetryRepository = ServiceLocator.telemetryRepository(context)
+    private val tokenManager = ServiceLocator.provideTokenManager(context)
     private val gson         = Gson()
 
     private val shownNotifications        = mutableSetOf<String>()
     private var lastConnectionWarningTime = 0L
     private val CONNECTION_WARNING_COOLDOWN_MS = 300_000L
+    private var homepageLoadStartMs: Long = 0L
+    private var homepageLoadReported = false
+
+    fun onHomepageOpened() {
+        homepageLoadStartMs = System.currentTimeMillis()
+        homepageLoadReported = false
+    }
+
+    fun onHomepageContentRendered(isSessionsReady: Boolean, isTopSubjectsReady: Boolean) {
+        if (!isSessionsReady || !isTopSubjectsReady || homepageLoadReported) return
+        if (homepageLoadStartMs <= 0L) return
+
+        val loadTimeMs = System.currentTimeMillis() - homepageLoadStartMs
+        val connectivityStatus = if (isDeviceOnline()) "online" else "offline"
+        val firebaseUid = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
+
+        homepageLoadReported = true
+        telemetryRepository.reportHomepageLoad(
+            loadTimeMs = loadTimeMs,
+            connectivityStatus = connectivityStatus,
+            userId = firebaseUid
+        )
+        Log.d(TAG, "Homepage telemetry sent: load_time_ms=$loadTimeMs, connectivity_status=$connectivityStatus, user_id=${firebaseUid ?: "null"}")
+    }
 
     // Connectivity monitoring for auto-refresh
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var monitoredTutorId: String = ""
-
-    // BQ15 telemetry — homepage load time
-    private var homepageLoadStartMs  = 0L
-    private var homepageLoadReported = false
 
     // ─────────────────────────────────────────────────────────────────────────
     // MULTI-THREADING: carga paralela con corrutinas anidadas
@@ -211,39 +233,6 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     fun onHomepageOpened() {
         homepageLoadStartMs  = System.currentTimeMillis()
         homepageLoadReported = false
-    }
-
-    /**
-     * Call whenever sessions or subjects state changes.
-     * Reports load time once both are ready (first Success emission).
-     */
-    fun onHomepageContentRendered(isSessionsReady: Boolean, isTopSubjectsReady: Boolean) {
-        if (homepageLoadReported || !isSessionsReady || !isTopSubjectsReady) return
-        homepageLoadReported = true
-        val loadTimeMs = System.currentTimeMillis() - homepageLoadStartMs
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val tokenManager = ServiceLocator.provideTokenManager(context)
-                val userId       = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
-                ServiceLocator.telemetryRepository(context)
-                    .reportHomepageLoad(loadTimeMs, getNetworkType(), userId)
-                Log.d(TAG, "BQ15 homepage load reported: ${loadTimeMs}ms")
-            } catch (e: Exception) {
-                Log.e(TAG, "BQ15 telemetry failed: ${e.message}")
-            }
-        }
-    }
-
-    private fun getNetworkType(): String {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = cm.activeNetwork ?: return "OFFLINE"
-        val caps = cm.getNetworkCapabilities(network) ?: return "UNKNOWN"
-        return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "CELLULAR"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
-            else -> "OTHER"
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -457,6 +446,14 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
         }
         latencies.average().toLong()
     } catch (e: Exception) { 2000L }
+
+    private fun isDeviceOnline(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val activeNetwork = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // HELPERS DE MAPEO

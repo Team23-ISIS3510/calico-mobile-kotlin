@@ -166,15 +166,30 @@ class TelemetryRepository(
         }
     }
 
-    /** BQ15: reports homepage load time. Fails silently — never blocks the UI. */
-    fun reportHomepageLoad(loadTimeMs: Long, connectivityStatus: String, userId: String?) {
+    fun reportHomepageLoad(
+        loadTimeMs: Long,
+        connectivityStatus: String,
+        userId: String?
+    ) {
         scope.launch {
+            val request = HomepageLoadRequest(
+                loadTimeMs = loadTimeMs,
+                connectivityStatus = connectivityStatus,
+                userId = userId
+            )
+
             try {
-                val request  = HomepageLoadRequest(loadTimeMs, connectivityStatus, userId)
-                val response = apiService.reportHomepageLoad(request)
+                Log.d("TelemetryRepository", "Sending HOMEPAGE_LOAD telemetry: ${gson.toJson(request)}")
+                var response = apiService.reportHomepageLoad(request)
                 if (!response.isSuccessful) {
-                    Log.e("TelemetryRepository",
-                        "Homepage load telemetry rejected: ${response.code()}")
+                    // Retry once without surfacing any UI error.
+                    response = apiService.reportHomepageLoad(request)
+                }
+                if (!response.isSuccessful) {
+                    Log.e(
+                        "TelemetryRepository",
+                        "Homepage load telemetry rejected: ${response.code()}"
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("TelemetryRepository", "Failed to send homepage load telemetry", e)
