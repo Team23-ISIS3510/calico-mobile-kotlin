@@ -18,14 +18,18 @@ import com.calico.tutor.domain.repository.AvailabilityRepository
 import com.calico.tutor.domain.utils.Result
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "AvailabilityVM"
+private const val ACTION_SYNC_TIMEOUT_MS = 6_000L
+private const val SYNC_DONE_BANNER_MS = 4_000L
 
 sealed class AvailabilityListState {
     object Idle    : AvailabilityListState()
@@ -37,7 +41,7 @@ sealed class AvailabilityListState {
 sealed class AvailabilityActionState {
     object Idle    : AvailabilityActionState()
     object Loading : AvailabilityActionState()
-    object Done    : AvailabilityActionState()
+    data class Done(val message: String? = null) : AvailabilityActionState()
     data class Error(val message: String) : AvailabilityActionState()
 }
 
@@ -90,15 +94,13 @@ class AvailabilityViewModel(
     private val gson        = Gson()
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var syncJob: Job? = null
 
     init {
         load()
         viewModelScope.launch {
-            val count = cacheDb.getPendingCount()
-            _pendingCount.value = count
-            if (count > 0 && !isConnected()) {
-                _bannerState.value = OfflineBannerState.PendingSync(count)
-            }
+            refreshPendingAndBanner()
+            if (isConnected()) triggerPendingSync(showDoneBanner = false)
         }
     }
 
@@ -110,7 +112,16 @@ class AvailabilityViewModel(
         val cm    = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val net   = cm.activeNetwork ?: return false
         val caps  = cm.getNetworkCapabilities(net) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    fun onScreenVisible() {
+        viewModelScope.launch {
+            refreshPendingAndBanner()
+            if (isConnected()) triggerPendingSync(showDoneBanner = false)
+            load()
+        }
     }
 
     /**
@@ -127,18 +138,18 @@ class AvailabilityViewModel(
             .build()
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                viewModelScope.launch {
-                    Log.d(TAG, "Connectivity restored — syncing pending actions")
-                    syncPendingActions()
+                if (isConnected()) triggerPendingSync(showDoneBanner = true)
+            }
+
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                    triggerPendingSync(showDoneBanner = true)
                 }
             }
+
             override fun onLost(network: Network) {
                 viewModelScope.launch {
-                    val count = cacheDb.getPendingCount()
-                    if (count > 0) {
-                        _bannerState.value = OfflineBannerState.PendingSync(count)
-                        Log.d(TAG, "Connectivity lost — $count action(s) pending")
-                    }
+                    refreshPendingAndBanner()
                 }
             }
         }
@@ -159,38 +170,54 @@ class AvailabilityViewModel(
     // Immediate sync on reconnect
     // ─────────────────────────────────────────────────────────────────────────
 
-    private suspend fun syncPendingActions() {
+    private fun triggerPendingSync(showDoneBanner: Boolean) {
+        if (syncJob?.isActive == true) return
+        syncJob = viewModelScope.launch {
+            Log.d(TAG, "Connectivity available — syncing pending actions")
+            syncPendingActions(showDoneBanner)
+        }
+    }
+
+    private suspend fun syncPendingActions(showDoneBanner: Boolean) {
+        if (!isConnected()) {
+            refreshPendingAndBanner()
+            return
+        }
+
         val pending = cacheDb.getAllPending()
         if (pending.isEmpty()) {
-            _bannerState.value = OfflineBannerState.Hidden
+            _bannerState.value = if (isConnected()) OfflineBannerState.Hidden else OfflineBannerState.PendingSync(0)
             return
         }
 
         var syncedCount = 0
         for (item in pending) {
             try {
-                val success = when (item.actionType) {
-                    CacheDatabase.ACTION_CREATE -> {
-                        val req = gson.fromJson(item.json, CreateAvailabilityRequest::class.java)
-                        repository.createAvailability(req) is Result.Success
-                    }
-                    CacheDatabase.ACTION_UPDATE -> {
-                        val id = item.availabilityId
-                        if (id == null) {
-                            cacheDb.deletePending(item.id); syncedCount++; continue
+                val success = withTimeoutOrNull(ACTION_SYNC_TIMEOUT_MS) {
+                    when (item.actionType) {
+                        CacheDatabase.ACTION_CREATE -> {
+                            val req = gson.fromJson(item.json, CreateAvailabilityRequest::class.java)
+                            repository.createAvailability(req) is Result.Success
                         }
-                        val req = gson.fromJson(item.json, UpdateAvailabilityRequest::class.java)
-                        repository.updateAvailability(id, req) is Result.Success
-                    }
-                    CacheDatabase.ACTION_DELETE -> {
-                        val tid = item.availabilityId
-                        if (tid == null) {
-                            cacheDb.deletePending(item.id); syncedCount++; continue
+                        CacheDatabase.ACTION_UPDATE -> {
+                            val id = item.availabilityId
+                            if (id == null) {
+                                cacheDb.deletePending(item.id); syncedCount++; return@withTimeoutOrNull true
+                            }
+                            val req = gson.fromJson(item.json, UpdateAvailabilityRequest::class.java)
+                            repository.updateAvailability(id, req) is Result.Success
                         }
-                        repository.deleteAvailabilitiesByTutor(tid) is Result.Success
+                        CacheDatabase.ACTION_DELETE -> {
+                            val availabilityId = item.availabilityId
+                            if (availabilityId == null) {
+                                cacheDb.deletePending(item.id); syncedCount++; return@withTimeoutOrNull true
+                            }
+                            repository.deleteAvailability(availabilityId) is Result.Success
+                        }
+                        else -> { cacheDb.deletePending(item.id); syncedCount++; true }
                     }
-                    else -> { cacheDb.deletePending(item.id); syncedCount++; continue }
-                }
+                } ?: false
+
                 if (success) {
                     cacheDb.deletePending(item.id)
                     syncedCount++
@@ -204,12 +231,15 @@ class AvailabilityViewModel(
 
         if (syncedCount > 0) {
             invalidateAndReload()
-            _bannerState.value = OfflineBannerState.SyncDone(syncedCount)
+            _bannerState.value = if (showDoneBanner) OfflineBannerState.SyncDone(syncedCount)
+                                 else OfflineBannerState.Hidden
             fileManager.appendLog("Synced $syncedCount action(s) on reconnect")
-            viewModelScope.launch {
-                delay(4_000)
-                if (_bannerState.value is OfflineBannerState.SyncDone) {
-                    _bannerState.value = OfflineBannerState.Hidden
+            if (showDoneBanner) {
+                viewModelScope.launch {
+                    delay(SYNC_DONE_BANNER_MS)
+                    if (_bannerState.value is OfflineBannerState.SyncDone) {
+                        _bannerState.value = OfflineBannerState.Hidden
+                    }
                 }
             }
         } else {
@@ -277,105 +307,57 @@ class AvailabilityViewModel(
     fun create(request: CreateAvailabilityRequest) {
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
+            val connectedAtAction = isConnected()
 
             val pendingId = cacheDb.savePending(gson.toJson(request), CacheDatabase.ACTION_CREATE)
             fileManager.appendLog("CREATE queued id=$pendingId tutorId=$tutorId")
 
-            if (!isConnected()) {
-                val count = cacheDb.getPendingCount()
-                _pendingCount.value = count
-                _bannerState.value  = OfflineBannerState.PendingSync(count)
-                _actionState.value  = AvailabilityActionState.Done
-                return@launch
-            }
+            applyLocalCreate(request)
 
-            when (val result = repository.createAvailability(request)) {
-                is Result.Success -> {
-                    cacheDb.deletePending(pendingId)
-                    refreshPendingCount()
-                    invalidateAndReload()
-                    updateBannerAfterOnlineAction()
-                    _actionState.value = AvailabilityActionState.Done
-                }
-                is Result.Error -> {
-                    Log.w(TAG, "Network failed CREATE id=$pendingId: ${result.message}")
-                    val count = cacheDb.getPendingCount()
-                    _pendingCount.value = count
-                    _bannerState.value  = OfflineBannerState.PendingSync(count)
-                    _actionState.value  = AvailabilityActionState.Done
-                }
-                is Result.Loading -> {}
-            }
+            refreshPendingAndBanner()
+            val pendingAfter = _pendingCount.value
+            _actionState.value = AvailabilityActionState.Done(
+                if (!connectedAtAction || pendingAfter > 0) "No internet connection. This will be saved later." else null
+            )
+            if (connectedAtAction) triggerPendingSync(showDoneBanner = false)
         }
     }
 
     fun update(id: String, request: UpdateAvailabilityRequest) {
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
+            val connectedAtAction = isConnected()
 
             val pendingId = cacheDb.savePending(gson.toJson(request), CacheDatabase.ACTION_UPDATE, id)
             fileManager.appendLog("UPDATE queued id=$pendingId availabilityId=$id")
 
-            if (!isConnected()) {
-                val count = cacheDb.getPendingCount()
-                _pendingCount.value = count
-                _bannerState.value  = OfflineBannerState.PendingSync(count)
-                _actionState.value  = AvailabilityActionState.Done
-                return@launch
-            }
+            applyLocalUpdate(id, request)
 
-            when (val result = repository.updateAvailability(id, request)) {
-                is Result.Success -> {
-                    cacheDb.deletePending(pendingId)
-                    refreshPendingCount()
-                    invalidateAndReload()
-                    updateBannerAfterOnlineAction()
-                    _actionState.value = AvailabilityActionState.Done
-                }
-                is Result.Error -> {
-                    Log.w(TAG, "Network failed UPDATE id=$pendingId: ${result.message}")
-                    val count = cacheDb.getPendingCount()
-                    _pendingCount.value = count
-                    _bannerState.value  = OfflineBannerState.PendingSync(count)
-                    _actionState.value  = AvailabilityActionState.Done
-                }
-                is Result.Loading -> {}
-            }
+            refreshPendingAndBanner()
+            val pendingAfter = _pendingCount.value
+            _actionState.value = AvailabilityActionState.Done(
+                if (!connectedAtAction || pendingAfter > 0) "No internet connection. Changes will be applied when connection is restored." else null
+            )
+            if (connectedAtAction) triggerPendingSync(showDoneBanner = false)
         }
     }
 
-    fun deleteByTutor() {
+    fun deleteAvailability(availabilityId: String) {
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
+            val connectedAtAction = isConnected()
 
-            val pendingId = cacheDb.savePending("{}", CacheDatabase.ACTION_DELETE, tutorId)
-            fileManager.appendLog("DELETE queued id=$pendingId tutorId=$tutorId")
+            val pendingId = cacheDb.savePending("{}", CacheDatabase.ACTION_DELETE, availabilityId)
+            fileManager.appendLog("DELETE queued id=$pendingId availabilityId=$availabilityId")
 
-            if (!isConnected()) {
-                val count = cacheDb.getPendingCount()
-                _pendingCount.value = count
-                _bannerState.value  = OfflineBannerState.PendingSync(count)
-                _actionState.value  = AvailabilityActionState.Done
-                return@launch
-            }
+            applyLocalDelete(availabilityId)
 
-            when (val result = repository.deleteAvailabilitiesByTutor(tutorId)) {
-                is Result.Success -> {
-                    cacheDb.deletePending(pendingId)
-                    refreshPendingCount()
-                    invalidateAndReload()
-                    updateBannerAfterOnlineAction()
-                    _actionState.value = AvailabilityActionState.Done
-                }
-                is Result.Error -> {
-                    Log.w(TAG, "Network failed DELETE id=$pendingId: ${result.message}")
-                    val count = cacheDb.getPendingCount()
-                    _pendingCount.value = count
-                    _bannerState.value  = OfflineBannerState.PendingSync(count)
-                    _actionState.value  = AvailabilityActionState.Done
-                }
-                is Result.Loading -> {}
-            }
+            refreshPendingAndBanner()
+            val pendingAfter = _pendingCount.value
+            _actionState.value = AvailabilityActionState.Done(
+                if (!connectedAtAction || pendingAfter > 0) "No internet connection. This will be deleted later." else null
+            )
+            if (connectedAtAction) triggerPendingSync(showDoneBanner = false)
         }
     }
 
@@ -383,44 +365,19 @@ class AvailabilityViewModel(
         if (requests.isEmpty()) return
         viewModelScope.launch {
             _actionState.value = AvailabilityActionState.Loading
+            val connectedAtAction = isConnected()
 
-            val pendingIds = requests.map { req ->
+            requests.forEach { req ->
                 cacheDb.savePending(gson.toJson(req), CacheDatabase.ACTION_CREATE)
+                applyLocalCreate(req)
             }
 
-            if (!isConnected()) {
-                val count = cacheDb.getPendingCount()
-                _pendingCount.value = count
-                _bannerState.value  = OfflineBannerState.PendingSync(count)
-                _actionState.value  = AvailabilityActionState.Done
-                fileManager.appendLog("Offline — batch of ${requests.size} CREATE(s) queued")
-                return@launch
-            }
-
-            var anyFailed = false
-            for ((index, request) in requests.withIndex()) {
-                when (val result = repository.createAvailability(request)) {
-                    is Result.Success -> {
-                        cacheDb.deletePending(pendingIds[index])
-                    }
-                    is Result.Error -> {
-                        anyFailed = true
-                        Log.w(TAG, "Batch network failed id=${pendingIds[index]}: ${result.message}")
-                    }
-                    else -> {}
-                }
-            }
-
-            refreshPendingCount()
-            invalidateAndReload()
-
-            if (anyFailed) {
-                val count = _pendingCount.value
-                _bannerState.value = OfflineBannerState.PendingSync(count)
-            } else {
-                updateBannerAfterOnlineAction()
-            }
-            _actionState.value = AvailabilityActionState.Done
+            refreshPendingAndBanner()
+            val pendingAfter = _pendingCount.value
+            _actionState.value = AvailabilityActionState.Done(
+                if (!connectedAtAction || pendingAfter > 0) "No internet connection. This will be saved later." else null
+            )
+            if (connectedAtAction) triggerPendingSync(showDoneBanner = false)
         }
     }
 
@@ -432,17 +389,64 @@ class AvailabilityViewModel(
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun refreshPendingCount() {
-        viewModelScope.launch {
-            _pendingCount.value = cacheDb.getPendingCount()
+    private suspend fun refreshPendingAndBanner() {
+        val count = cacheDb.getPendingCount()
+        _pendingCount.value = count
+        _bannerState.value = if (!isConnected()) {
+            OfflineBannerState.PendingSync(count)
+        } else {
+            OfflineBannerState.Hidden
         }
     }
 
-    private suspend fun updateBannerAfterOnlineAction() {
-        val count = cacheDb.getPendingCount()
-        _pendingCount.value = count
-        _bannerState.value = if (count > 0) OfflineBannerState.PendingSync(count)
-                             else OfflineBannerState.Hidden
+    private suspend fun applyLocalCreate(request: CreateAvailabilityRequest) {
+        val current = (_listState.value as? AvailabilityListState.Success)?.items ?: emptyList()
+        val optimistic = AvailabilityItem(
+            id = "local-${System.currentTimeMillis()}",
+            title = request.title,
+            date = request.date,
+            startTime = request.startTime,
+            endTime = request.endTime,
+            location = request.location,
+            description = request.description,
+            course = request.course
+        )
+        val updated = (current + optimistic)
+            .distinctBy { it.id }
+            .sortedWith(compareBy({ it.date }, { it.startTime }))
+        updateLocalAvailabilityCache(updated)
+    }
+
+    private suspend fun applyLocalUpdate(id: String, request: UpdateAvailabilityRequest) {
+        val current = (_listState.value as? AvailabilityListState.Success)?.items ?: return
+        val updated = current.map { item ->
+            if (item.id == id) {
+                item.copy(
+                    title = request.title ?: item.title,
+                    date = request.date ?: item.date,
+                    startTime = request.startTime ?: item.startTime,
+                    endTime = request.endTime ?: item.endTime,
+                    location = request.location ?: item.location,
+                    description = request.description ?: item.description,
+                    course = request.course ?: item.course
+                )
+            } else item
+        }.sortedWith(compareBy({ it.date }, { it.startTime }))
+        updateLocalAvailabilityCache(updated)
+    }
+
+    private suspend fun applyLocalDelete(availabilityId: String) {
+        val current = (_listState.value as? AvailabilityListState.Success)?.items ?: emptyList()
+        val updated = current.filterNot { it.id == availabilityId }
+        updateLocalAvailabilityCache(updated)
+    }
+
+    private suspend fun updateLocalAvailabilityCache(items: List<AvailabilityItem>) {
+        val cacheKey = "${CacheDatabase.KEY_AVAILABILITIES}_$tutorId"
+        val type = object : TypeToken<List<AvailabilityItem>>() {}.type
+        cacheDb.saveCache(cacheKey, gson.toJson(items, type))
+        memoryCache.put(cacheKey, items)
+        _listState.value = AvailabilityListState.Success(items)
     }
 
     private suspend fun invalidateAndReload() {

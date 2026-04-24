@@ -70,12 +70,12 @@ class PendingAvailabilitiesWorker(
                             }
                         }
                         CacheDatabase.ACTION_DELETE -> {
-                            val tutorId  = item.availabilityId
-                            if (tutorId == null) {
-                                Log.w(TAG, "DELETE id=${item.id} has no tutorId — skipping")
+                            val availabilityId = item.availabilityId
+                            if (availabilityId == null) {
+                                Log.w(TAG, "DELETE id=${item.id} has no availabilityId — skipping")
                                 true
                             } else {
-                                val response = apiService.deleteAvailabilitiesByTutor(tutorId)
+                                val response = apiService.deleteAvailability(availabilityId)
                                 response.isSuccessful.also { ok ->
                                     if (!ok) Log.w(TAG, "DELETE rejected id=${item.id}: HTTP ${response.code()}")
                                 }

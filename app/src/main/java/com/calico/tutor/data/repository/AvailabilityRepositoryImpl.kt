@@ -91,26 +91,26 @@ class AvailabilityRepositoryImpl(
         }
     }
 
-    override suspend fun deleteAvailabilitiesByTutor(tutorId: String): Result<Unit> {
+    override suspend fun deleteAvailability(availabilityId: String): Result<Unit> {
         return try {
-            Log.d(TAG, "DELETE /availability/tutor/$tutorId")
-            val response = apiService.deleteAvailabilitiesByTutor(tutorId)
+            Log.d(TAG, "DELETE /availability/$availabilityId")
+            val response = apiService.deleteAvailability(availabilityId)
             when {
                 response.isSuccessful -> {
-                    Log.d(TAG, "Eliminadas disponibilidades del tutor: $tutorId (${response.code()})")
+                    Log.d(TAG, "Eliminada disponibilidad: $availabilityId (${response.code()})")
                     Result.Success(Unit)
                 }
-                response.code() == 404 -> Result.Error(Exception("404"), "Tutor availability list not found")
+                response.code() == 404 -> Result.Error(Exception("404"), "Availability not found")
                 else -> {
-                    Log.e(TAG, "HTTP ${response.code()} al eliminar disponibilidades del tutor")
+                    Log.e(TAG, "HTTP ${response.code()} al eliminar disponibilidad")
                     Result.Error(Exception("HTTP ${response.code()}"), "Server error. Please try again later")
                 }
             }
         } catch (e: HttpException) {
-            if (e.code() == 404) Result.Error(e, "Tutor availability list not found")
+            if (e.code() == 404) Result.Error(e, "Availability not found")
             else Result.Error(e, "Server error. Please try again later")
         } catch (e: Exception) {
-            Log.e(TAG, "Error eliminando disponibilidades del tutor: ${e.message}", e)
+            Log.e(TAG, "Error eliminando disponibilidad: ${e.message}", e)
             Result.Error(e, "Server error. Please try again later")
         }
     }

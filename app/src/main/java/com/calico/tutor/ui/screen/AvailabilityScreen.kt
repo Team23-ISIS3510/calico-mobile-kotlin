@@ -48,6 +48,7 @@ import com.calico.tutor.ui.viewmodel.AvailabilityListState
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModel
 import com.calico.tutor.ui.viewmodel.AvailabilityViewModelFactory
 import com.calico.tutor.ui.viewmodel.OfflineBannerState
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
@@ -90,7 +91,10 @@ fun AvailabilityScreen(
     var repeatOption by remember { mutableStateOf(RepeatOption.NONE) }
     var showRepeatSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { vm.startConnectivityMonitoring() }
+    LaunchedEffect(Unit) {
+        vm.startConnectivityMonitoring()
+        vm.onScreenVisible()
+    }
 
     LaunchedEffect(actionState) {
         when (val s = actionState) {
@@ -99,6 +103,10 @@ fun AvailabilityScreen(
                 vm.resetActionState()
             }
             is AvailabilityActionState.Done -> {
+                s.message?.let {
+                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                    delay(700)
+                }
                 vm.resetActionState()
                 selectedTab = 0
                 createStep = 0
@@ -296,7 +304,7 @@ private fun SeeAvailabilitiesTab(
                                 color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(dayItems) { item ->
-                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.deleteByTutor() })
+                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.deleteAvailability(item.id) })
                             Spacer(Modifier.height(8.dp))
                         }
                     }
@@ -623,7 +631,7 @@ private fun OfflinePendingBanner(count: Int) {
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "No internet connection. $count ${if (count == 1) "availability" else "availabilities"} pending to sync.",
+            text = "No internet connection. Changes will be synchronized later.",
             color = PrimaryOrange,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
@@ -649,7 +657,7 @@ private fun SyncDoneBanner(syncedCount: Int) {
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "Connection restored. $syncedCount ${if (syncedCount == 1) "availability" else "availabilities"} synchronized.",
+            text = "Changes synchronized successfully.",
             color = Color(0xFF2E7D32),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
