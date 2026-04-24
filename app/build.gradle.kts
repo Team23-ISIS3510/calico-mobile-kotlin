@@ -21,12 +21,13 @@ val firebaseApiKey = (
         ?: envProperties.getProperty("FIREBASE_API_KEY")
     )?.trim().orEmpty()
 
-require(googleWebClientId.isNotBlank()) {
-    "Missing GOOGLE_WEB_CLIENT_ID in local.properties"
+// Optional: Firebase API key for development builds
+if (googleWebClientId.isBlank()) {
+    logger.warn("GOOGLE_WEB_CLIENT_ID not found - Google Sign-In will not work")
 }
 
-require(firebaseApiKey.isNotBlank()) {
-    "Missing FIREBASE_API_KEY in local.properties or .env"
+if (firebaseApiKey.isBlank()) {
+    logger.warn("FIREBASE_API_KEY not found - using placeholder for development")
 }
 
 android {
