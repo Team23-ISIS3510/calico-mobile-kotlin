@@ -1,6 +1,5 @@
 package com.calico.tutor.data.datasource.remote
 
-import com.calico.tutor.data.dto.HomepageLoadRequest
 import com.calico.tutor.data.dto.request.BugReportRequest
 import com.calico.tutor.data.dto.request.HomepageLoadRequest
 import retrofit2.Response
