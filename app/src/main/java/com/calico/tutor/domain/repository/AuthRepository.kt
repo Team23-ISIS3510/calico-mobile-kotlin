@@ -14,6 +14,8 @@ interface AuthRepository {
         courses: List<String>? = null
     ): Result<AuthToken>
 
+    suspend fun loginWithGoogle(idToken: String, email: String? = null): Result<AuthToken>
+
     suspend fun getStoredToken(): Result<AuthToken?>
     suspend fun clearToken(): Result<Unit>
     suspend fun isTokenValid(): Boolean

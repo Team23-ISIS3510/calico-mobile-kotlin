@@ -21,12 +21,17 @@ import com.calico.tutor.domain.model.Subject
 import com.calico.tutor.ui.theme.*
 import android.content.Context
 
+data class SubjectFrequency(
+    val subject: Subject,
+    val frequency: Int
+)
+
 @Composable
 fun TopSubjectsScreen(
     context: Context,
     onNavigateBack: () -> Unit = {}
 ) {
-    var topSubjects by remember { mutableStateOf<List<Pair<Subject, Int>>>(emptyList()) }
+    var topSubjects by remember { mutableStateOf<List<SubjectFrequency>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -35,36 +40,39 @@ fun TopSubjectsScreen(
             val subjectsApiService = ServiceLocator.subjectsApiService(context)
             val response = subjectsApiService.getSubjectsHistory()
             
+            // Process data from the endpoint
             if (response.data != null) {
-                val courseMap = mutableMapOf<String, Pair<String, Int>>()
+                // Group by courseId to get frequencies
+                val courseFrequencyMap = mutableMapOf<String, Pair<String, Int>>()
                 
                 response.data.forEach { courseData ->
                     val courseId = courseData.courseId
                     val courseName = courseData.course ?: "Unnamed"
                     
-                    if (courseMap.containsKey(courseId)) {
-                        val (name, count) = courseMap[courseId]!!
-                        courseMap[courseId] = Pair(name, count + 1)
+                    if (courseFrequencyMap.containsKey(courseId)) {
+                        val (name, count) = courseFrequencyMap[courseId]!!
+                        courseFrequencyMap[courseId] = Pair(name, count + 1)
                     } else {
-                        courseMap[courseId] = Pair(courseName, 1)
+                        courseFrequencyMap[courseId] = Pair(courseName, 1)
                     }
                 }
                 
-                topSubjects = courseMap.entries.map { (courseId, nameAndCount) ->
+                // Convert to SubjectFrequency and sort by frequency (top 3)
+                topSubjects = courseFrequencyMap.entries.map { (courseId, nameAndCount) ->
                     val subject = Subject(
                         id = courseId,
                         name = nameAndCount.first,
-                        code = "",
+                        code = courseId.take(4).uppercase(),
                         count = nameAndCount.second
                     )
-                    Pair(subject, nameAndCount.second)
-                }.sortedByDescending { it.second }
+                    SubjectFrequency(subject, nameAndCount.second)
+                }.sortedByDescending { it.frequency }
                     .take(3)
             }
             
             isLoading = false
         } catch (e: Exception) {
-            error = "Error loading subjects"
+            error = "Error loading subjects: ${e.message}"
             isLoading = false
         }
     }
@@ -72,16 +80,17 @@ fun TopSubjectsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(WhiteBase)
+            .background(Color.White)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Header with back arrow
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(elevation = 4.dp),
-                color = WhiteBase
+                color = Color.White
             ) {
                 Row(
                     modifier = Modifier
@@ -93,7 +102,7 @@ fun TopSubjectsScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextColorBlack
+                            tint = Color.Black
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -101,11 +110,12 @@ fun TopSubjectsScreen(
                         text = "Top 3 Subjects",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurface
+                        color = Color.Black
                     )
                 }
             }
 
+            // Content
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -131,13 +141,13 @@ fun TopSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = ErrorCardBackground
+                            containerColor = Color(0xFFFFEBEE)
                         )
                     ) {
                         Text(
                             text = error ?: "Unknown error",
                             modifier = Modifier.padding(16.dp),
-                            color = ErrorCardText,
+                            color = Color(0xFFC62828),
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -148,7 +158,7 @@ fun TopSubjectsScreen(
                             .shadow(elevation = 2.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = SurfaceVariant
+                            containerColor = Color(0xFFF5F5F5)
                         )
                     ) {
                         Text(
@@ -159,11 +169,11 @@ fun TopSubjectsScreen(
                         )
                     }
                 } else {
-                    topSubjects.forEachIndexed { index, (subject, frequency) ->
+                    topSubjects.forEachIndexed { index, subjectFreq ->
                         TopSubjectCard(
                             ranking = index + 1,
-                            subject = subject.name,
-                            frequency = frequency
+                            subject = subjectFreq.subject.name,
+                            frequency = subjectFreq.frequency
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
@@ -172,7 +182,7 @@ fun TopSubjectsScreen(
 
                     // Apply Button
                     Button(
-                        onClick = { onNavigateBack() },
+                        onClick = {},
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -183,7 +193,7 @@ fun TopSubjectsScreen(
                         )
                     ) {
                         Text(
-                            text = "Done",
+                            text = "Apply Now",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )

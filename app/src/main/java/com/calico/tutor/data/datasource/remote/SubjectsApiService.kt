@@ -20,6 +20,7 @@ import retrofit2.http.Query
 
 interface SubjectsApiService {
     @GET("subjects/history")
+    
     suspend fun getSubjectsHistory(): SubjectsHistoryResponse
 
     @GET("subjects/history/tutor/{tutorId}")
@@ -36,12 +37,6 @@ interface SubjectsApiService {
 
     @GET("tutoring-sessions/tutor/{tutorId}")
     suspend fun getTutoringSessionsForTutor(@Path("tutorId") tutorId: String): TutoringSessionsResponse
-
-    @GET("tutoring-sessions/tutor/{tutorId}/previous")
-    suspend fun getPreviousSessions(@Path("tutorId") tutorId: String): TutoringSessionsResponse
-
-    @GET("tutoring-sessions/tutor/{tutorId}/upcoming")
-    suspend fun getUpcomingSessions(@Path("tutorId") tutorId: String): TutoringSessionsResponse
 
     @GET("analytics/tutor-occupancy/{tutorId}")
     suspend fun getTutorOccupancy(@Path("tutorId") tutorId: String): TutorOccupancyResponse

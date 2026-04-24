@@ -98,9 +98,15 @@ class HomeScreenViewModel(
                     Log.e("HomeScreenViewModel", "Error loading tutor profile: ${e.message}")
                 }
 
-                // Cargar sesiones previas
-                val previousResponse = subjectsApiService.getPreviousSessions(tutorId)
-                val previousSessions = previousResponse.sessions.map { sessionData ->
+                // Cargar todas las sesiones y filtrar por tiempo
+                val allSessionsResponse = subjectsApiService.getTutoringSessionsForTutor(tutorId)
+                val now = System.currentTimeMillis()
+                val dateFmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.getDefault())
+                val dateFmtShort = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault())
+
+                val allMapped = allSessionsResponse.sessions.map { sessionData ->
+                    val startMs = try { dateFmt.parse(sessionData.scheduledStart)?.time ?: 0L }
+                        catch (e: Exception) { try { dateFmtShort.parse(sessionData.scheduledStart)?.time ?: 0L } catch (e2: Exception) { 0L } }
                     Session(
                         id = sessionData.id,
                         scheduledStart = sessionData.scheduledStart,
@@ -113,29 +119,13 @@ class HomeScreenViewModel(
                         tutorName = "",
                         subjectName = "",
                         subjectCode = ""
-                    )
+                    ) to startMs
                 }
+
+                val previousSessions = allMapped.filter { it.second < now }.sortedByDescending { it.second }.map { it.first }
+                val upcomingSessions = allMapped.filter { it.second > now }.sortedBy { it.second }.map { it.first }
 
                 Log.d("HomeScreenViewModel", "Previous sessions loaded: ${previousSessions.size}")
-
-                // Cargar sesiones próximas
-                val upcomingResponse = subjectsApiService.getUpcomingSessions(tutorId)
-                val upcomingSessions = upcomingResponse.sessions.map { sessionData ->
-                    Session(
-                        id = sessionData.id,
-                        scheduledStart = sessionData.scheduledStart,
-                        scheduledEnd = sessionData.scheduledEnd,
-                        status = sessionData.status,
-                        course = sessionData.course,
-                        courseId = sessionData.courseId,
-                        date = "",
-                        time = "",
-                        tutorName = "",
-                        subjectName = "",
-                        subjectCode = ""
-                    )
-                }
-
                 Log.d("HomeScreenViewModel", "Upcoming sessions loaded: ${upcomingSessions.size}")
 
                 _sessionsState.value = SessionsState.Success(previousSessions, upcomingSessions)
@@ -178,8 +168,8 @@ class HomeScreenViewModel(
             while (true) {
                 try {
                     Log.d("SessionAlertPolling", "Fetching session alert from /analytics/session-alert...")
-                    val analyticsRepository = ServiceLocator.analyticsRepository(context)
-                    val alertResponse = analyticsRepository.getSessionAlert()
+                    val analyticsApiService = ServiceLocator.analyticsApiService(context)
+                    val alertResponse = analyticsApiService.getSessionAlert()
                     
                     Log.d("SessionAlertPolling", "Alert response received: hasAlert=${alertResponse.hasAlert}, studentName=${alertResponse.studentName}, minutesToStart=${alertResponse.minutesToStart}, sessionId=${alertResponse.sessionId}")
                     

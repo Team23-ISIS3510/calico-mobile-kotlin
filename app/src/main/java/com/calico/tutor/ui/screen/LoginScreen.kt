@@ -1,5 +1,6 @@
 package com.calico.tutor.ui.screen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,16 +42,15 @@ import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
-import com.calico.tutor.ui.theme.MainBackground
 import com.calico.tutor.ui.theme.PrimaryOrange
-import com.calico.tutor.ui.theme.TextColorBlack
-import com.calico.tutor.util.EmailValidator
 
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit,
     onRegisterClick: () -> Unit,
+    onGoogleLoginClick: (() -> Unit)? = null,
     isLoading: Boolean = false,
+    isGoogleLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
     onRetry: (() -> Unit)? = null
@@ -58,34 +58,11 @@ fun LoginScreen(
     val (email, setEmail) = remember { mutableStateOf("") }
     val (password, setPassword) = remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
-    
-    // Email validation
-    val emailError = remember(email) {
-        if (email.isNotBlank() && !EmailValidator.isValidEmail(email)) {
-            "Invalid email format"
-        } else {
-            null
-        }
-    }
-    
-    // Password validation - must be at least 6 characters
-    val passwordError = remember(password) {
-        if (password.isNotBlank() && password.length < 6) {
-            "Password must be at least 6 characters"
-        } else {
-            null
-        }
-    }
-    
-    // Error display logic
-    val showEmailError = emailError != null
-    val showPasswordError = passwordError != null
-    val showAuthenticationError = emailError == null && passwordError == null && errorMessage != null
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MainBackground)
+            .background(CreamBackground)
     ) {
         Column(
             modifier = Modifier
@@ -111,7 +88,7 @@ fun LoginScreen(
             // Email/Username Input
             OutlinedTextField(
                 value = email,
-                onValueChange = { if (it.length <= 254) setEmail(it) },
+                onValueChange = { setEmail(it) },
                 placeholder = {
                     Text(
                         "Username or Email",
@@ -127,30 +104,18 @@ fun LoginScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextColorBlack,
-                    unfocusedTextColor = TextColorBlack
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
                 ),
-                singleLine = true,
-                isError = showEmailError
+                singleLine = true
             )
-            
-            // Email validation error in red
-            if (showEmailError) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    emailError!!,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Password Input
             OutlinedTextField(
                 value = password,
-                onValueChange = { if (it.length <= 128) setPassword(it) },
+                onValueChange = { setPassword(it) },
                 placeholder = {
                     Text(
                         "Password",
@@ -166,31 +131,18 @@ fun LoginScreen(
                     disabledContainerColor = CreamInput,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextColorBlack,
-                    unfocusedTextColor = TextColorBlack
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
                 ),
                 visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                isError = showPasswordError
+                singleLine = true
             )
-            
-            // Password validation error in red
-            if (showPasswordError) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    passwordError!!,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
 
-            // Authentication error message (only show if fields are valid)
-            if (showAuthenticationError) {
+            if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    errorMessage!!,
-                    color = Color.Red,
+                    errorMessage,
+                    color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -206,15 +158,15 @@ fun LoginScreen(
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryOrange,
-                    contentColor = TextColorBlack
+                    contentColor = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && email.isNotEmpty() && password.length >= 6 && !showEmailError && !showPasswordError
+                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = TextColorBlack,
+                        color = Color.Black,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -228,6 +180,60 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Google Login Button
+            if (onGoogleLoginClick != null) {
+                Button(
+                    onClick = onGoogleLoginClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading && !isGoogleLoading,
+                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+                ) {
+                    if (isGoogleLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color(0xFFEA4335),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "G",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEA4335)
+                                )
+                            }
+                            Spacer(modifier = Modifier.size(12.dp))
+                            Text(
+                                "Sign in with Google",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             // Register Button
             Button(
                 onClick = onRegisterClick,
@@ -236,7 +242,7 @@ fun LoginScreen(
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = BeigeButton,
-                    contentColor = TextColorBlack
+                    contentColor = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {

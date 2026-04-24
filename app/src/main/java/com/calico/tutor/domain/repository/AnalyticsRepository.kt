@@ -1,6 +1,5 @@
 package com.calico.tutor.domain.repository
 
-import com.calico.tutor.data.dto.response.SessionAlertResponse
 import com.calico.tutor.domain.model.TutorAnalyticsResponse
 
 /**
@@ -20,11 +19,4 @@ interface AnalyticsRepository {
      * @return Respuesta con analítica del tutor
      */
     suspend fun getTutorDemandAnalytics(tutorId: String): TutorAnalyticsResponse
-
-    /**
-     * Gets session alert information from the server
-     * @return SessionAlertResponse containing alert status and session details
-     */
-    suspend fun getSessionAlert(): SessionAlertResponse
 }
-
