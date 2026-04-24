@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,11 +31,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calico.tutor.R
 import com.calico.tutor.data.dto.request.CreateAvailabilityRequest
@@ -91,9 +93,16 @@ fun AvailabilityScreen(
     var repeatOption by remember { mutableStateOf(RepeatOption.NONE) }
     var showRepeatSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        vm.startConnectivityMonitoring()
-        vm.onScreenVisible()
+    // Register connectivity monitoring once, refresh data on every resume
+    LaunchedEffect(Unit) { vm.startConnectivityMonitoring() }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.onScreenVisible()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(actionState) {
@@ -103,9 +112,9 @@ fun AvailabilityScreen(
                 vm.resetActionState()
             }
             is AvailabilityActionState.Done -> {
-                s.message?.let {
-                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-                    delay(700)
+                vm.consumePendingActionMessage()?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    delay(350)
                 }
                 vm.resetActionState()
                 selectedTab = 0
@@ -152,9 +161,9 @@ fun AvailabilityScreen(
 
             // Offline / sync status banner (Eventual Connectivity)
             when (val banner = bannerState) {
-                is OfflineBannerState.PendingSync -> OfflinePendingBanner(banner.count)
-                is OfflineBannerState.SyncDone    -> SyncDoneBanner(banner.syncedCount)
-                is OfflineBannerState.Hidden      -> {}
+                is OfflineBannerState.Offline  -> OfflineBanner(banner.message)
+                is OfflineBannerState.SyncDone -> SyncDoneBanner()
+                is OfflineBannerState.Hidden   -> {}
             }
 
             when (selectedTab) {
@@ -204,15 +213,6 @@ fun AvailabilityScreen(
                     )
                 }
             }
-        }
-
-        // Only show blocking overlay while actively waiting for a network response.
-        // OfflineSaved/Done/Error are emitted immediately, so this disappears quickly.
-        if (actionState is AvailabilityActionState.Loading) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator(color = PrimaryOrange) }
         }
     }
 
@@ -304,7 +304,11 @@ private fun SeeAvailabilitiesTab(
                                 color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(dayItems) { item ->
-                            AvailabilityCard(item, onEdit = { onNavigateToEdit(item) }, onDelete = { vm.deleteAvailability(item.id) })
+                            AvailabilityCard(
+                                item    = item,
+                                onEdit  = { onNavigateToEdit(item) },
+                                onDelete = { vm.deleteAvailability(item.id) }
+                            )
                             Spacer(Modifier.height(8.dp))
                         }
                     }
@@ -582,10 +586,12 @@ private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelet
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Delete tutor availabilities") },
-            text = { Text("This will delete all availabilities for this tutor. Continue?") },
+            title = { Text("Delete availability") },
+            text = { Text("Are you sure you want to delete this availability?") },
             confirmButton = {
-                TextButton(onClick = { showDialog = false; onDelete() }) { Text("Delete all", color = Color.Red) }
+                TextButton(onClick = { showDialog = false; onDelete() }) {
+                    Text("Delete", color = Color.Red)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) { Text("Cancel") }
@@ -608,14 +614,17 @@ private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelet
             }
             Column {
                 IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit", tint = PrimaryOrange) }
-                IconButton(onClick = { showDialog = true }) { Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFE53935)) }
+                IconButton(onClick = { showDialog = true }) {
+                    Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFE53935))
+                }
             }
         }
     }
 }
 
+/** Orange banner for any offline state — message is operation-specific. */
 @Composable
-private fun OfflinePendingBanner(count: Int) {
+private fun OfflineBanner(message: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -631,7 +640,7 @@ private fun OfflinePendingBanner(count: Int) {
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "No internet connection. Changes will be synchronized later.",
+            text = message,
             color = PrimaryOrange,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
@@ -640,8 +649,9 @@ private fun OfflinePendingBanner(count: Int) {
     }
 }
 
+/** Green banner shown after successful sync — auto-hides after 4 s. */
 @Composable
-private fun SyncDoneBanner(syncedCount: Int) {
+private fun SyncDoneBanner() {
     Row(
         modifier = Modifier
             .fillMaxWidth()

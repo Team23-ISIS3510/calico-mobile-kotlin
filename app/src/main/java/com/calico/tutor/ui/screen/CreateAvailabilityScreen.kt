@@ -80,9 +80,9 @@ fun CreateAvailabilityScreen(
     LaunchedEffect(actionState) {
         when (val s = actionState) {
             is AvailabilityActionState.Done -> {
-                s.message?.let { msg ->
-                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                    delay(700)
+                vm.consumePendingActionMessage()?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    delay(350)
                 }
                 vm.resetActionState()
                 onNavigateBack()
