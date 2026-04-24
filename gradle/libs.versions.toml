@@ -16,8 +16,14 @@ securityCrypto = "1.1.0-alpha06"
 lifecycleVersion = "2.8.7"
 kotestVersion = "5.9.1"
 kotlin = "2.2.0"
+firebaseAuthVersion = "22.3.1"
+googlePlayServicesAuthVersion = "20.7.0"
 jwtVersion = "4.4.0"
 coilVersion = "2.7.0"
+room = "2.7.1"
+datastorePreferences = "1.1.1"
+workManager = "2.10.1"
+ksp = "2.2.0-1.0.29"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -49,6 +55,7 @@ okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-i
 # Coroutines
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 # Security & Encryption
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
@@ -64,6 +71,9 @@ kotest-assertions = { group = "io.kotest", name = "kotest-assertions-core", vers
 
 # Image Loading
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilVersion" }
+# Firebase & Google Play Services
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuthVersion" }
+google-play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "googlePlayServicesAuthVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

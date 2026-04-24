@@ -13,3 +13,29 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Kotlin compilation sessions
+.kotlin/
+*.salive
+
+# Build artifacts
+/app/build/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iws
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+.env

@@ -16,3 +16,9 @@ data class RegisterRequest(
     @SerializedName("courses")
     val courses: List<String>? = null
 )
+
+data class GoogleLoginRequest(
+    val idToken: String,
+    @SerializedName("user_id")
+    val userId: String? = null
+)
