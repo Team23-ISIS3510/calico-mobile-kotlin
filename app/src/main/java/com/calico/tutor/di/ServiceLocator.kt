@@ -24,6 +24,7 @@ import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
 import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 import com.calico.tutor.domain.usecase.ClearTokenUseCase
+import com.calico.tutor.ui.screen.DatabaseHelper
 
 object ServiceLocator {
     // ── Almacenamiento local y caché ─────────────────────────────────────────
@@ -31,6 +32,7 @@ object ServiceLocator {
     @Volatile private var _userPreferences: UserPreferencesDataStore? = null
     @Volatile private var _inMemoryCache: InMemoryCache? = null
     @Volatile private var _fileManager: FileManager? = null
+    @Volatile private var _databaseHelper: DatabaseHelper? = null
 
     fun cacheDatabase(context: Context): CacheDatabase =
         _cacheDatabase ?: synchronized(this) {
@@ -50,6 +52,11 @@ object ServiceLocator {
     fun fileManager(context: Context): FileManager =
         _fileManager ?: synchronized(this) {
             _fileManager ?: FileManager(context.applicationContext).also { _fileManager = it }
+        }
+
+    fun provideDatabaseHelper(context: Context): DatabaseHelper =
+        _databaseHelper ?: synchronized(this) {
+            _databaseHelper ?: DatabaseHelper(context.applicationContext).also { _databaseHelper = it }
         }
 
     // ── Autenticación ─────────────────────────────────────────────────────────
