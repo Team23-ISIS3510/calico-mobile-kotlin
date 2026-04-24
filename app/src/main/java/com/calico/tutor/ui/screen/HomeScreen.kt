@@ -54,8 +54,17 @@ fun HomeScreen(
     val tutorName      by vm.tutorName.collectAsState()
 
     LaunchedEffect(tutorId) {
+        vm.onHomepageOpened()
         vm.loadAllData(tutorId)
         vm.startSessionAlertPolling()
+        vm.startConnectivityMonitoring(tutorId)
+    }
+
+    LaunchedEffect(sessionsState, subjectsState) {
+        vm.onHomepageContentRendered(
+            isSessionsReady   = sessionsState is SessionsState.Success,
+            isTopSubjectsReady = subjectsState is SubjectsState.Success
+        )
     }
 
     val displayName = tutorName.ifBlank { userName }

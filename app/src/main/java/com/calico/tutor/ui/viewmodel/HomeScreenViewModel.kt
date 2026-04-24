@@ -1,6 +1,10 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,6 +16,7 @@ import com.calico.tutor.data.dto.response.TutoringSessionData
 import com.calico.tutor.data.local.CacheDatabase
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
+import com.calico.tutor.util.JwtUtils
 import com.calico.tutor.util.NotificationHelper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -107,6 +112,14 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     private var lastConnectionWarningTime = 0L
     private val CONNECTION_WARNING_COOLDOWN_MS = 300_000L
 
+    // Connectivity monitoring for auto-refresh
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var monitoredTutorId: String = ""
+
+    // BQ15 telemetry — homepage load time
+    private var homepageLoadStartMs  = 0L
+    private var homepageLoadReported = false
+
     // ─────────────────────────────────────────────────────────────────────────
     // MULTI-THREADING: carga paralela con corrutinas anidadas
     // ─────────────────────────────────────────────────────────────────────────
@@ -146,6 +159,92 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     }
 
     fun refreshData(tutorId: String) = loadAllData(tutorId)
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // EVENTUAL CONNECTIVITY: auto-refresh when network returns
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Registers a ConnectivityManager callback that reloads data whenever the
+     * device regains internet access and the home data is missing or in error.
+     * Must be called once from the composable's LaunchedEffect.
+     */
+    fun startConnectivityMonitoring(tutorId: String) {
+        if (networkCallback != null) return   // already registered
+        monitoredTutorId = tutorId
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val req = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val needsLoad = _sessionsState.value is SessionsState.Error ||
+                    _sessionsState.value is SessionsState.Idle ||
+                    _occupancyState.value is OccupancyState.Error ||
+                    _subjectsState.value is SubjectsState.Error
+                if (needsLoad) {
+                    viewModelScope.launch(Dispatchers.Main) {
+                        Log.d(TAG, "Connectivity restored — reloading home data")
+                        loadAllData(monitoredTutorId)
+                    }
+                }
+            }
+        }
+        cm.registerNetworkCallback(req, networkCallback!!)
+        Log.d(TAG, "Connectivity monitoring started for $tutorId")
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        networkCallback?.let { cb ->
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            try { cm.unregisterNetworkCallback(cb) } catch (_: Exception) {}
+        }
+        networkCallback = null
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // BQ15 TELEMETRY: homepage load time
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Call when the Home composable enters composition (before data loads). */
+    fun onHomepageOpened() {
+        homepageLoadStartMs  = System.currentTimeMillis()
+        homepageLoadReported = false
+    }
+
+    /**
+     * Call whenever sessions or subjects state changes.
+     * Reports load time once both are ready (first Success emission).
+     */
+    fun onHomepageContentRendered(isSessionsReady: Boolean, isTopSubjectsReady: Boolean) {
+        if (homepageLoadReported || !isSessionsReady || !isTopSubjectsReady) return
+        homepageLoadReported = true
+        val loadTimeMs = System.currentTimeMillis() - homepageLoadStartMs
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tokenManager = ServiceLocator.provideTokenManager(context)
+                val userId       = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
+                ServiceLocator.telemetryRepository(context)
+                    .reportHomepageLoad(loadTimeMs, getNetworkType(), userId)
+                Log.d(TAG, "BQ15 homepage load reported: ${loadTimeMs}ms")
+            } catch (e: Exception) {
+                Log.e(TAG, "BQ15 telemetry failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun getNetworkType(): String {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return "OFFLINE"
+        val caps = cm.getNetworkCapabilities(network) ?: return "UNKNOWN"
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "CELLULAR"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
+            else -> "OTHER"
+        }
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // FETCH HELPERS — se ejecutan en Dispatchers.IO via async(IO)

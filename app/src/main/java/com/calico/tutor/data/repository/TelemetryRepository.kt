@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.dto.request.BugReportRequest
+import com.calico.tutor.data.dto.request.HomepageLoadRequest
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -161,6 +162,22 @@ class TelemetryRepository(
                 }
             } catch (e: Exception) {
                 Log.e("TelemetryRepository", "Failed to send latency report", e)
+            }
+        }
+    }
+
+    /** BQ15: reports homepage load time. Fails silently — never blocks the UI. */
+    fun reportHomepageLoad(loadTimeMs: Long, connectivityStatus: String, userId: String?) {
+        scope.launch {
+            try {
+                val request  = HomepageLoadRequest(loadTimeMs, connectivityStatus, userId)
+                val response = apiService.reportHomepageLoad(request)
+                if (!response.isSuccessful) {
+                    Log.e("TelemetryRepository",
+                        "Homepage load telemetry rejected: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("TelemetryRepository", "Failed to send homepage load telemetry", e)
             }
         }
     }

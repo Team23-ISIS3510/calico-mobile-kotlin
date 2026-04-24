@@ -12,23 +12,34 @@ import kotlinx.coroutines.withContext
  *
  * Tablas:
  * - cache_home: caché JSON de respuestas de red (upcoming, previous, occupancy, subjects, availabilities).
- * - pending_availabilities: cola de disponibilidades pendientes de sincronización offline.
+ * - pending_availabilities: cola de acciones pendientes de sincronización offline (CREATE/UPDATE/DELETE).
  *
- * Todas las operaciones de escritura/lectura son suspend y usan Dispatchers.IO
- * para no bloquear el hilo principal (compatible con el patrón corrutinas del proyecto).
+ * Todas las operaciones de escritura/lectura son suspend y usan Dispatchers.IO.
  */
 class CacheDatabase(context: Context) : SQLiteOpenHelper(
     context.applicationContext, DATABASE_NAME, null, DATABASE_VERSION
 ) {
     companion object {
         private const val DATABASE_NAME = "calico_cache.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
 
-        const val KEY_SESSIONS    = "sessions"
-        const val KEY_OCCUPANCY   = "occupancy"
-        const val KEY_SUBJECTS    = "subjects_recommended"
+        const val KEY_SESSIONS       = "sessions"
+        const val KEY_OCCUPANCY      = "occupancy"
+        const val KEY_SUBJECTS       = "subjects_recommended"
         const val KEY_AVAILABILITIES = "availabilities"
+
+        const val ACTION_CREATE = "CREATE"
+        const val ACTION_UPDATE = "UPDATE"
+        const val ACTION_DELETE = "DELETE"
     }
+
+    /** Represents one row of pending_availabilities. */
+    data class PendingItem(
+        val id: Long,
+        val json: String,
+        val actionType: String,
+        val availabilityId: String?
+    )
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -42,15 +53,18 @@ class CacheDatabase(context: Context) : SQLiteOpenHelper(
             """CREATE TABLE pending_availabilities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 availability_json TEXT NOT NULL,
+                action_type TEXT NOT NULL DEFAULT 'CREATE',
+                availability_id TEXT,
                 created_at INTEGER NOT NULL
             )"""
         )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS cache_home")
-        db.execSQL("DROP TABLE IF EXISTS pending_availabilities")
-        onCreate(db)
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE pending_availabilities ADD COLUMN action_type TEXT NOT NULL DEFAULT 'CREATE'")
+            db.execSQL("ALTER TABLE pending_availabilities ADD COLUMN availability_id TEXT")
+        }
     }
 
     /** Guarda o reemplaza una entrada de caché (INSERT OR REPLACE). */
@@ -77,28 +91,44 @@ class CacheDatabase(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    /** Inserta una disponibilidad en la cola de pendientes y devuelve su id. */
-    suspend fun savePending(availabilityJson: String): Long = withContext(Dispatchers.IO) {
+    /** Inserta una acción pendiente en la cola y devuelve su id. */
+    suspend fun savePending(
+        availabilityJson: String,
+        actionType: String = ACTION_CREATE,
+        availabilityId: String? = null
+    ): Long = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
             put("availability_json", availabilityJson)
+            put("action_type", actionType)
+            put("availability_id", availabilityId)
             put("created_at", System.currentTimeMillis())
         }
         writableDatabase.insert("pending_availabilities", null, values)
     }
 
     /** Obtiene todos los registros pendientes ordenados por fecha de creación. */
-    suspend fun getAllPending(): List<Pair<Long, String>> = withContext(Dispatchers.IO) {
-        val result = mutableListOf<Pair<Long, String>>()
+    suspend fun getAllPending(): List<PendingItem> = withContext(Dispatchers.IO) {
+        val result = mutableListOf<PendingItem>()
         readableDatabase.query(
-            "pending_availabilities", arrayOf("id", "availability_json"),
+            "pending_availabilities",
+            arrayOf("id", "availability_json", "action_type", "availability_id"),
             null, null, null, null, "created_at ASC"
         ).use { cursor ->
-            while (cursor.moveToNext()) result.add(cursor.getLong(0) to cursor.getString(1))
+            while (cursor.moveToNext()) {
+                result.add(
+                    PendingItem(
+                        id             = cursor.getLong(0),
+                        json           = cursor.getString(1),
+                        actionType     = cursor.getString(2) ?: ACTION_CREATE,
+                        availabilityId = cursor.getString(3)
+                    )
+                )
+            }
         }
         result
     }
 
-    /** Elimina una disponibilidad pendiente por su id tras sincronización exitosa. */
+    /** Elimina una acción pendiente por su id tras sincronización exitosa. */
     suspend fun deletePending(id: Long) = withContext(Dispatchers.IO) {
         writableDatabase.delete("pending_availabilities", "id = ?", arrayOf(id.toString()))
     }

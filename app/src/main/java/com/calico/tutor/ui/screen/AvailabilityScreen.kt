@@ -93,6 +93,17 @@ fun AvailabilityScreen(
                 Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
                 vm.resetActionState()
             }
+            is AvailabilityActionState.OfflineSaved -> {
+                Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
+                vm.resetActionState()
+                selectedTab = 0
+                createStep = 0
+                selectedDate = ""
+                selectedStartTime = START_TIME_SLOTS[0]
+                selectedEndTime = END_TIME_SLOTS[1]
+                title = ""
+                repeatOption = RepeatOption.NONE
+            }
             is AvailabilityActionState.Done -> {
                 vm.resetActionState()
                 selectedTab = 0
@@ -211,9 +222,11 @@ fun AvailabilityScreen(
             }
         }
 
+        // Only show blocking overlay while actively waiting for a network response.
+        // OfflineSaved/Done/Error are emitted immediately, so this disappears quickly.
         if (actionState is AvailabilityActionState.Loading) {
             Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator(color = PrimaryOrange) }
         }
