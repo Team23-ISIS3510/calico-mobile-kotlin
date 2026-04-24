@@ -79,6 +79,103 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                         Log.w(TAG, "Silent sign-in falló, token seguirá hasta expirar")
                     }
                 }
+            } catch (e: Exception) {
+                Log.e("AuthScreen", "❌ Error al extraer Firebase UID: ${e.message}")
+                null
+            } ?: tokenManager.getFirebaseUid() // Fallback: intentar obtener del almacenamiento
+            
+            val userName = email
+                .substringBefore("@")
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            
+            // Bottom navigation items
+            val navItems = listOf(
+                NavBarItem(label = "Home", icon = Icons.Filled.Home, route = "home"),
+                NavBarItem(label = "Courses", icon = Icons.Filled.Home, route = "courses"),
+                NavBarItem(label = "Statistics", icon = Icons.Filled.Home, route = "statistics"),
+                NavBarItem(label = "Profile", icon = Icons.Filled.Person, route = "profile")
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(WhiteBase)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Screen content (takes up available space)
+                    Box(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        when (currentScreen) {
+                            "home" -> {
+                                HomeScreen(
+                                    userName = userName,
+                                    tutorId = firebaseUid ?: email,
+                                    context = context,
+                                    onLogout = {
+                                        viewModel.resetState()
+                                    },
+                                    onNavigateToTopSubjects = {
+                                        setCurrentScreen("topSubjects")
+                                    }
+                                )
+                            }
+                            "topSubjects" -> {
+                                TopSubjectsScreen(
+                                    context = context,
+                                    onNavigateBack = { setCurrentScreen("home") }
+                                )
+                            }
+                            "courses" -> {
+                                val dbHelper = remember { DatabaseHelper(context) }
+                                val coursesViewModel = remember { CoursesViewModel(context, dbHelper) }
+                                CoursesScreen(
+                                    tutorId = firebaseUid ?: email,
+                                    context = context,
+                                    viewModel = coursesViewModel
+                                )
+                            }
+                            "statistics" -> {
+                                StatisticsScreen()
+                            }
+                            "profile" -> {
+                                ProfileScreen(
+                                    userName = userName,
+                                    userEmail = email ?: "",
+                                    onLogout = {
+                                        viewModel.resetState()
+                                    }
+                                )
+                            }
+                            else -> {
+                                HomeScreen(
+                                    userName = userName,
+                                    tutorId = firebaseUid ?: email,
+                                    context = context,
+                                    onLogout = {
+                                        viewModel.resetState()
+                                    },
+                                    onNavigateToTopSubjects = {
+                                        setCurrentScreen("topSubjects")
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Bottom Navigation Bar
+                    BottomNavBar(
+                        currentRoute = currentScreen,
+                        items = navItems,
+                        onNavigate = { route ->
+                            if (route != "topSubjects") { // Don't navigate to topSubjects from navbar
+                                setCurrentScreen(route)
+                            }
+                        }
+                    )
+                }
             }
         }
     }
