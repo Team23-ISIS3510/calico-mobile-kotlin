@@ -1,20 +1,20 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.calico.tutor.di.ServiceLocator
-import com.calico.tutor.data.dto.response.TutorResponse
+import com.calico.tutor.ui.screen.DatabaseHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.net.URL
 
 sealed class ProfileState {
     object Idle : ProfileState()
@@ -23,9 +23,9 @@ sealed class ProfileState {
         val userName: String,
         val userEmail: String,
         val profileImageUrl: String? = null,
-        val cachedPicturePath: String? = null,
         val rating: Double? = null,
-        val bio: String? = null
+        val bio: String? = null,
+        val isOffline: Boolean = false
     ) : ProfileState()
     data class Error(val message: String) : ProfileState()
 }
@@ -39,30 +39,57 @@ class ProfileViewModel(
 
     private val tokenManager by lazy { ServiceLocator.provideTokenManager(context) }
 
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     fun loadProfile() {
         viewModelScope.launch {
             _profileState.value = ProfileState.Loading
 
-            try {
-                val email = tokenManager.getEmail() ?: "User"
-                val firebaseUid = tokenManager.getFirebaseUid()
+            val email = tokenManager.getEmail() ?: "User"
+            val firebaseUid = tokenManager.getFirebaseUid()
+            
+            // Check network once at the start
+            val hasNetwork = isNetworkAvailable()
+            Log.d("ProfileViewModel", "Network available: $hasNetwork")
 
+// If no network, go directly to offline
+            if (!hasNetwork) {
+                loadFromCache(email, isOffline = true)
+                return@launch
+            }
+
+            try {
+                // Try online first
                 val tutorResponse = withContext(Dispatchers.IO) {
-                    try {
-                        firebaseUid?.let { uid ->
-                            ServiceLocator.subjectsApiService(context).getTutorProfile(uid)
-                        }
-                    } catch (e: Exception) {
-                        null
+                    firebaseUid?.let { uid ->
+                        ServiceLocator.subjectsApiService(context).getTutorProfile(uid)
                     }
                 }
 
-                var cachedPicturePath: String? = null
+                var profileImageUrl: String? = null
 
-                // Cache profile picture if URL exists
-                if (!tutorResponse?.profileImage.isNullOrEmpty()) {
-                    cachedPicturePath = withContext(Dispatchers.IO) {
-                        cacheProfilePicture(tutorResponse!!.profileImage)
+                if (tutorResponse != null) {
+                    profileImageUrl = tutorResponse.profileImage ?: tutorResponse.profilePictureUrl
+                    
+                    // Save to SQLite for offline
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val profile = DatabaseHelper.TutorProfile(
+                                name = tutorResponse.name,
+                                email = tutorResponse.email,
+                                subject = tutorResponse.courses?.firstOrNull(),
+                                profileImageUrl = profileImageUrl
+                            )
+                            ServiceLocator.provideDatabaseHelper(context).saveTutorProfile(profile)
+                            Log.d("ProfileViewModel", "✅ Saved profile to SQLite")
+                        } catch (e: Exception) {
+                            Log.e("ProfileViewModel", "❌ Failed to save profile: ${e.message}")
+                        }
                     }
                 }
 
@@ -74,95 +101,85 @@ class ProfileViewModel(
                 _profileState.value = ProfileState.Success(
                     userName = userName,
                     userEmail = tutorResponse?.email ?: email,
-                    profileImageUrl = tutorResponse?.profileImage,
-                    cachedPicturePath = cachedPicturePath,
+                    profileImageUrl = profileImageUrl,
                     rating = tutorResponse?.rating,
-                    bio = tutorResponse?.bio
+                    bio = tutorResponse?.bio,
+                    isOffline = false
                 )
 
             } catch (e: Exception) {
-                val email = tokenManager.getEmail() ?: "User"
-                val userName = email.substringBefore("@").replaceFirstChar { 
-                    if (it.isLowerCase()) it.titlecase() else it.toString() 
+                Log.w("ProfileViewModel", "❌ Online failed: ${e.message}")
+                
+                // We already confirmed network exists above, so use cached data without offline banner
+                var profileImageUrl: String? = null
+                var cachedName = ""
+                var cachedEmail = ""
+                
+                withContext(Dispatchers.IO) {
+                    try {
+                        val dbHelper = ServiceLocator.provideDatabaseHelper(context)
+                        val profiles = dbHelper.getTutorProfiles()
+                        if (profiles.isNotEmpty()) {
+                            val profile = profiles.first()
+                            profileImageUrl = profile.profileImageUrl
+                            cachedName = profile.name
+                            cachedEmail = profile.email
+                        }
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
                 }
 
+                val userName = cachedName.ifEmpty { 
+                    email.substringBefore("@").replaceFirstChar { 
+                        if (it.isLowerCase()) it.titlecase() else it.toString() 
+                    }
+                }
+
+                // Network existed, just API failed - show as ONLINE
                 _profileState.value = ProfileState.Success(
                     userName = userName,
-                    userEmail = email
+                    userEmail = cachedEmail.ifEmpty { email },
+                    profileImageUrl = profileImageUrl,
+                    isOffline = false
                 )
             }
         }
     }
 
-    private fun cacheProfilePicture(url: String?): String? {
-        if (url.isNullOrEmpty()) return null
-
-        return try {
-            val cacheDir = context.cacheDir
-            val file = File(cacheDir, "profile_temp.jpg")
-
-            if (file.exists()) {
-                return file.absolutePath
-            }
-
-            val inputStream = URL(url).openStream()
-            val outputStream = FileOutputStream(file)
-
-            inputStream.use { input ->
-                outputStream.use { output ->
-                    input.copyTo(output)
-                }
-            }
-
-            file.absolutePath
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    fun cacheProfilePictureFromUrl(url: String?) {
-        if (url.isNullOrEmpty()) return
-
-        viewModelScope.launch(Dispatchers.IO) {
+    private suspend fun loadFromCache(email: String, isOffline: Boolean) {
+        var profileImageUrl: String? = null
+        var cachedName = ""
+        var cachedEmail = ""
+        
+        withContext(Dispatchers.IO) {
             try {
-                val cacheDir = context.cacheDir
-                val file = File(cacheDir, "profile_temp.jpg")
-
-                val inputStream = URL(url).openStream()
-                val outputStream = FileOutputStream(file)
-
-                inputStream.use { input ->
-                    outputStream.use { output ->
-                        input.copyTo(output)
-                    }
-                }
-
-                withContext(Dispatchers.Main) {
-                    val currentState = _profileState.value
-                    if (currentState is ProfileState.Success) {
-                        _profileState.value = currentState.copy(cachedPicturePath = file.absolutePath)
-                    }
+                val dbHelper = ServiceLocator.provideDatabaseHelper(context)
+                val profiles = dbHelper.getTutorProfiles()
+                if (profiles.isNotEmpty()) {
+                    val profile = profiles.first()
+                    profileImageUrl = profile.profileImageUrl
+                    cachedName = profile.name
+                    cachedEmail = profile.email
+                    Log.d("ProfileViewModel", "✅ Loaded from SQLite: $profileImageUrl")
                 }
             } catch (e: Exception) {
-                // Silently fail
+                Log.e("ProfileViewModel", "❌ Failed to load from SQLite: ${e.message}")
             }
         }
-    }
 
-    fun getCachedProfilePicture(): File? {
-        val cacheDir = context.cacheDir
-        val file = File(cacheDir, "profile_temp.jpg")
-        return if (file.exists()) file else null
-    }
-
-    fun clearCache() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val cacheDir = context.cacheDir
-            val file = File(cacheDir, "profile_temp.jpg")
-            if (file.exists()) {
-                file.delete()
+        val userName = cachedName.ifEmpty { 
+            email.substringBefore("@").replaceFirstChar { 
+                if (it.isLowerCase()) it.titlecase() else it.toString() 
             }
         }
+
+        _profileState.value = ProfileState.Success(
+            userName = userName,
+            userEmail = cachedEmail.ifEmpty { email },
+            profileImageUrl = profileImageUrl,
+            isOffline = isOffline
+        )
     }
 }
 

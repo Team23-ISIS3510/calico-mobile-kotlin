@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.ProfileState
 import com.calico.tutor.ui.viewmodel.ProfileViewModel
@@ -83,6 +84,22 @@ private fun ProfileContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
+        if (state.isOffline) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+            ) {
+                Text(
+                    text = "Viewing offline data. Check your connection.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFFF57C00),
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
@@ -105,19 +122,13 @@ private fun ProfileContent(
                 .align(Alignment.CenterHorizontally),
             contentAlignment = Alignment.Center
         ) {
-            val cachedFile = state.cachedPicturePath?.let { File(it) }
-            if (cachedFile != null && cachedFile.exists()) {
-                val bitmap = BitmapFactory.decodeFile(cachedFile.absolutePath)
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    DefaultAvatar(name = state.userName)
-                }
+            if (!state.profileImageUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = state.profileImageUrl,
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
             } else {
                 DefaultAvatar(name = state.userName)
             }

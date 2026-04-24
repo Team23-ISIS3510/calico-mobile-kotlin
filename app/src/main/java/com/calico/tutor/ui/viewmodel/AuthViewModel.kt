@@ -12,10 +12,12 @@ import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
 import com.calico.tutor.domain.utils.Result
 import com.calico.tutor.util.EmailValidator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -218,7 +220,6 @@ class AuthViewModel(
     }
 
     fun logout() {
-        // Clear token using TokenManager (EncryptedSharedPreferences)
         val tokenManager = ServiceLocator.provideTokenManager(context)
         tokenManager.clearToken()
         _authState.value = AuthState.Idle

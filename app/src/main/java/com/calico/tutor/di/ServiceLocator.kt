@@ -15,6 +15,7 @@ import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
+import com.calico.tutor.ui.screen.DatabaseHelper
 
 object ServiceLocator {
     @Volatile
@@ -33,6 +34,8 @@ object ServiceLocator {
     private var analyticsRepository: AnalyticsRepository? = null
     @Volatile
     private var telemetryRepository: TelemetryRepository? = null
+    @Volatile
+    private var databaseHelper: DatabaseHelper? = null
 
     private fun getTokenManager(context: Context): TokenManager {
         return _tokenManager ?: synchronized(this) {
@@ -148,4 +151,10 @@ object ServiceLocator {
     // Expose TokenManager publicly
     fun provideTokenManager(context: Context): TokenManager =
         getTokenManager(context)
+
+    fun provideDatabaseHelper(context: Context): DatabaseHelper {
+        return databaseHelper ?: synchronized(this) {
+            databaseHelper ?: DatabaseHelper(context.applicationContext).also { databaseHelper = it }
+        }
+    }
 }

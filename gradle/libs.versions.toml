@@ -17,6 +17,7 @@ lifecycleVersion = "2.8.7"
 kotestVersion = "5.9.1"
 kotlin = "2.2.0"
 jwtVersion = "4.4.0"
+coilVersion = "2.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -60,6 +61,9 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecyc
 # Testing
 kotest-runner = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotestVersion" }
 kotest-assertions = { group = "io.kotest", name = "kotest-assertions-core", version.ref = "kotestVersion" }
+
+# Image Loading
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

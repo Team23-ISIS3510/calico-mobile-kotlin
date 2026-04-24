@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
@@ -26,6 +27,7 @@ import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.CoursesState
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.screen.DatabaseHelper
 import android.content.Context
 import android.util.Log
 
@@ -36,9 +38,10 @@ fun CoursesScreen(
     viewModel: CoursesViewModel? = null
 ) {
     val coursesState by viewModel?.coursesState?.collectAsState() ?: remember { mutableStateOf<CoursesState>(CoursesState.Idle) }
+    val isApplying by viewModel?.isApplying?.collectAsState() ?: remember { mutableStateOf(false) }
+    val applicationQueued by viewModel?.applicationQueued?.collectAsState() ?: remember { mutableStateOf(false) }
     var showApplicationDialog by remember { mutableStateOf(false) }
     var selectedCourseForApplication by remember { mutableStateOf<AvailableCourseResponse?>(null) }
-    var isApplying by remember { mutableStateOf(false) }
     var applicationNotes by remember { mutableStateOf("") }
     var expandedApproved by remember { mutableStateOf(true) }
     var expandedAvailable by remember { mutableStateOf(true) }
@@ -46,6 +49,33 @@ fun CoursesScreen(
 
     LaunchedEffect(tutorId) {
         viewModel?.loadData(tutorId)
+    }
+
+    // Close dialog when application is queued/submitted
+    LaunchedEffect(applicationQueued) {
+        if (applicationQueued && showApplicationDialog) {
+            showApplicationDialog = false
+            selectedCourseForApplication = null
+            applicationNotes = ""
+            viewModel?.resetApplicationQueued()
+        }
+    }
+
+    // Legacy: also check when isApplying completes
+    LaunchedEffect(isApplying) {
+        if (!isApplying && showApplicationDialog) {
+            val currentState = viewModel?.coursesState?.value
+            if (currentState is CoursesState.Success) {
+                val courseId = selectedCourseForApplication?.id
+                val hasNewApplication = currentState.applications.any { it.courseId == courseId && it.status == "pending" }
+                val hasPendingApplication = currentState.pendingApplications.any { it.courseId == courseId }
+                if (hasNewApplication || hasPendingApplication) {
+                    showApplicationDialog = false
+                    selectedCourseForApplication = null
+                    applicationNotes = ""
+                }
+            }
+        }
     }
 
     Box(
@@ -139,8 +169,11 @@ fun CoursesScreen(
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 state.availableCourses.forEach { course ->
+                                    val hasApiApplication = state.applications.any { it.courseId == course.id && it.status == "pending" }
+                                    val hasPendingApplication = state.pendingApplications.any { it.courseId == course.id }
+                                    val isApplied = course.hasApplied || hasApiApplication || hasPendingApplication
                                     AvailableCourseCardCompact(
-                                        course = course,
+                                        course = course.copy(hasApplied = isApplied),
                                         onApplyClick = {
                                             selectedCourseForApplication = course
                                             showApplicationDialog = true
@@ -154,13 +187,19 @@ fun CoursesScreen(
                     }
 
                     val pendingApplications = state.applications.filter { it.status == "pending" }
-                    if (pendingApplications.isNotEmpty()) {
+                    if (pendingApplications.isNotEmpty() || state.pendingApplications.isNotEmpty()) {
+                        val totalPending = pendingApplications.size + state.pendingApplications.size
                         CollapsibleSection(
-                            title = "PENDING APPLICATIONS (${pendingApplications.size})",
+                            title = "PENDING APPLICATIONS ($totalPending)",
                             isExpanded = expandedPending,
                             onToggle = { expandedPending = !expandedPending }
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // Show offline queued applications first
+                                state.pendingApplications.forEach { app ->
+                                    PendingApplicationCard(app)
+                                }
+                                // Show API pending applications
                                 pendingApplications.forEach { app ->
                                     ApplicationCardCompact(app)
                                 }
@@ -197,15 +236,18 @@ fun CoursesScreen(
             onNotesChange = { applicationNotes = it },
             isApplying = isApplying,
             onApply = {
-                if (context != null && selectedCourseForApplication != null) {
-                    isApplying = true
-                }
+                viewModel?.applyForCourse(
+                    tutorId = tutorId,
+                    courseId = selectedCourseForApplication!!.id,
+                    courseName = selectedCourseForApplication!!.name,
+                    courseCode = selectedCourseForApplication!!.code,
+                    notes = applicationNotes.ifBlank { null }
+                )
             },
             onDismiss = {
                 showApplicationDialog = false
                 selectedCourseForApplication = null
                 applicationNotes = ""
-                isApplying = false
             }
         )
     }
@@ -405,7 +447,6 @@ private fun ApplicationCardCompact(app: CourseApplicationResponse) {
                         fontSize = 12.sp
                     )
                 }
-                
                 Box(
                     modifier = Modifier
                         .background(
@@ -445,6 +486,56 @@ private fun ApplicationCardCompact(app: CourseApplicationResponse) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PendingApplicationCard(app: DatabaseHelper.PendingApplication) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(10.dp)),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = app.courseName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = app.courseCode,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MediumGray,
+                        fontSize = 12.sp
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.CloudOff,
+                        contentDescription = null,
+                        tint = Color(0xFFFF9800),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Queued",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFFF9800),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+}
     }
 }
 
