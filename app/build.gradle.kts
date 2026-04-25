@@ -1,6 +1,33 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+val envProperties = Properties().apply {
+    val file = rootProject.file(".env")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+val googleWebClientId = localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")?.trim().orEmpty()
+val firebaseApiKey = (
+    localProperties.getProperty("FIREBASE_API_KEY")
+        ?: envProperties.getProperty("FIREBASE_API_KEY")
+    )?.trim().orEmpty()
+
+// Optional: Firebase API key for development builds
+if (googleWebClientId.isBlank()) {
+    logger.warn("GOOGLE_WEB_CLIENT_ID not found - Google Sign-In will not work")
+}
+
+if (firebaseApiKey.isBlank()) {
+    logger.warn("FIREBASE_API_KEY not found - using placeholder for development")
 }
 
 android {
@@ -15,6 +42,20 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"$googleWebClientId\""
+        )
+
+        buildConfigField(
+            "String",
+            "FIREBASE_API_KEY",
+            "\"$firebaseApiKey\""
+        )
+
+        resValue("string", "google_web_client_id", googleWebClientId)
     }
 
     buildTypes {
@@ -33,6 +74,8 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+        resValues = true
     }
 
 }
@@ -64,10 +107,14 @@ dependencies {
     // Coroutines
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
+    implementation(libs.coroutines.play.services)
 
     // Security
     implementation(libs.androidx.security.crypto)
     implementation(libs.java.jwt)
+
+    // Image Loading
+    implementation(libs.coil.compose)
 
     // Lifecycle & ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
@@ -79,4 +126,13 @@ dependencies {
     testImplementation(libs.kotest.assertions)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Google Play Services for Google Sign-In
+    implementation(libs.google.play.services.auth)
+
+    // WorkManager
+    implementation(libs.work.runtime.ktx)
+
+    // DataStore Preferences
+    implementation(libs.datastore.preferences)
 }

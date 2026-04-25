@@ -31,7 +31,7 @@ class SessionsRepositoryImpl(
             Log.d(TAG, "Fetching previous sessions for tutor: $tutorId")
             
             // Step 1: Obtener datos del DataSource (API)
-            val response = subjectsApiService.getPreviousSessions(tutorId)
+            val response = subjectsApiService.getTutoringSessionsForTutor(tutorId)
             
             // Step 2: Validar
             if (response.sessions.isNotEmpty()) {
@@ -58,7 +58,7 @@ class SessionsRepositoryImpl(
             Log.d(TAG, "Fetching upcoming sessions for tutor: $tutorId")
             
             // Step 1: Obtener datos del DataSource (API)
-            val response = subjectsApiService.getUpcomingSessions(tutorId)
+            val response = subjectsApiService.getTutoringSessionsForTutor(tutorId)
             
             // Step 2: Validar
             if (response.sessions.isNotEmpty()) {

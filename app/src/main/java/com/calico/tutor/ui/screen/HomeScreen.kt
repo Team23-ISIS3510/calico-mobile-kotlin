@@ -1,5 +1,6 @@
 package com.calico.tutor.ui.screen
 
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,20 +22,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calico.tutor.R
-import com.calico.tutor.ui.theme.*
-import com.calico.tutor.di.ServiceLocator
-import com.calico.tutor.domain.model.Session
+import com.calico.tutor.data.dto.response.CourseData
 import com.calico.tutor.data.dto.response.TutorOccupancyData
-import com.calico.tutor.data.dto.response.DemandMetrics
-import com.calico.tutor.ui.viewmodel.HomeScreenViewModel
+import com.calico.tutor.domain.model.Session
+import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.HomeScreenViewModelFactory
-import com.calico.tutor.ui.viewmodel.SessionsState
+import com.calico.tutor.ui.viewmodel.HomeScreenViewModel
 import com.calico.tutor.ui.viewmodel.OccupancyState
-import android.content.Context
-import android.content.pm.ApplicationInfo
+import com.calico.tutor.ui.viewmodel.SessionsState
+import com.calico.tutor.ui.viewmodel.SubjectsState
 import java.text.SimpleDateFormat
 import java.util.*
-import android.util.Log
 
 @Composable
 fun HomeScreen(
@@ -44,48 +42,37 @@ fun HomeScreen(
     onLogout: () -> Unit = {},
     onNavigateToTopSubjects: () -> Unit = {}
 ) {
-    // Obtener ViewModel
-    val viewModel: HomeScreenViewModel = viewModel(
-        factory = context?.let { HomeScreenViewModelFactory(it) }
+    if (context == null) return
+
+    val vm: HomeScreenViewModel = viewModel(
+        factory = HomeScreenViewModelFactory(context)
     )
 
-    // Observar estados del ViewModel
-    val sessionsStateValue = viewModel.sessionsState.collectAsState().value
-    val occupancyStateValue = viewModel.occupancyState.collectAsState().value
-    val tutorNameValue = viewModel.tutorName.collectAsState().value
+    val sessionsState  by vm.sessionsState.collectAsState()
+    val occupancyState by vm.occupancyState.collectAsState()
+    val subjectsState  by vm.subjectsState.collectAsState()
+    val tutorName      by vm.tutorName.collectAsState()
 
-    // Cargar datos al inicializar
-    LaunchedEffect(Unit) {
-        viewModel.loadSessions(tutorId)
-        viewModel.loadOccupancy(tutorId)
+    LaunchedEffect(tutorId) {
+        vm.onHomepageOpened()
+        vm.loadAllData(tutorId)
+        vm.startSessionAlertPolling()
+        vm.startConnectivityMonitoring(tutorId)
     }
 
-    // Extraer datos del estado de sesiones
-    val (previousSessions, upcomingSessions, sessionsError) = when (sessionsStateValue) {
-        is SessionsState.Success -> Triple(
-            sessionsStateValue.previousSessions,
-            sessionsStateValue.upcomingSessions,
-            null
+    LaunchedEffect(sessionsState, subjectsState) {
+        vm.onHomepageContentRendered(
+            isSessionsReady    = sessionsState is SessionsState.Success,
+            isTopSubjectsReady = subjectsState is SubjectsState.Success
         )
-        is SessionsState.Error -> Triple(emptyList(), emptyList(), sessionsStateValue.message)
-        else -> Triple(emptyList(), emptyList(), null)
     }
 
-    val isLoadingSessions = sessionsStateValue is SessionsState.Loading
-
-    // Extraer datos del estado de ocupancy
-    val (occupancyData, occupancyError) = when (occupancyStateValue) {
-        is OccupancyState.Success -> Pair(occupancyStateValue.data, null)
-        is OccupancyState.Error -> Pair(emptyList(), occupancyStateValue.message)
-        else -> Pair(emptyList(), null)
-    }
-
-    val isLoadingOccupancy = occupancyStateValue is OccupancyState.Loading
+    val displayName = tutorName.ifBlank { userName }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(WhiteBase)
+            .background(Color.White)
     ) {
         Column(
             modifier = Modifier
@@ -95,12 +82,7 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Logo Calico - Centered
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Image(
                     painter = painterResource(id = R.drawable.calico_logo),
                     contentDescription = "Calico Logo",
@@ -110,9 +92,8 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Welcome Message
             Text(
-                text = "WELCOME TO CALICO,\n$tutorNameValue",
+                text = "WELCOME TO CALICO,\n$displayName",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -123,453 +104,295 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Upcoming Sessions Section
+            // ── Vista 1: Upcoming Sessions ────────────────────────────────────
             Text(
                 text = "Upcoming Sessions",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isLoadingSessions) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = PrimaryOrange)
+            when (val state = sessionsState) {
+                is SessionsState.Loading -> LoadingBox()
+                is SessionsState.Error   -> ErrorText(state.message)
+                is SessionsState.Success -> {
+                    if (state.upcomingSessions.isEmpty()) {
+                        Text(
+                            text = "You do not have any upcoming tutoring sessions.",
+                            color = MediumGray,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        state.upcomingSessions.take(2).forEach { session ->
+                            SessionCard(session = session)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
                 }
-            } else if (sessionsError != null && upcomingSessions.isEmpty() && previousSessions.isEmpty()) {
-                Text(
-                    text = sessionsError,
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else if (upcomingSessions.isEmpty()) {
-                Text(
-                    text = "You do not have any upcoming tutoring sessions.",
-                    color = MediumGray,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                upcomingSessions.forEach { session ->
-                    SessionCard(session = session, context = context)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Previous Sessions Section
+            // ── Vista 2: Previous Sessions ────────────────────────────────────
             Text(
                 text = "Previous Sessions",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = OnSurface
+                color = Color.Black
             )
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (previousSessions.isEmpty() && !isLoadingSessions) {
-                Text(
-                    text = "You have not had any tutoring sessions yet.",
-                    color = MediumGray,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                previousSessions.forEach { session ->
-                    SessionCard(session = session, context = context)
-                    Spacer(modifier = Modifier.height(12.dp))
+            when (val state = sessionsState) {
+                is SessionsState.Loading -> LoadingBox()
+                is SessionsState.Error   -> ErrorText(state.message)
+                is SessionsState.Success -> {
+                    if (state.previousSessions.isEmpty()) {
+                        Text(
+                            text = "You have not had any tutoring sessions yet.",
+                            color = MediumGray,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        state.previousSessions.take(2).forEach { session ->
+                            SessionCard(session = session)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
                 }
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Subject Occupancy Analytics Section
+            // ── Vista 4: Recommended Subjects ─────────────────────────────────
+            Text(
+                text = "Recommended Subjects",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            when (val state = subjectsState) {
+                is SubjectsState.Loading -> LoadingBox(height = 60.dp)
+                is SubjectsState.Error   -> ErrorText(state.message)
+                is SubjectsState.Success -> {
+                    if (state.subjects.isEmpty()) {
+                        Text(
+                            text = "No recommended subjects available.",
+                            color = MediumGray,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        state.subjects.take(5).forEach { subj ->
+                            SubjectChip(name = subj.course ?: subj.courseId)
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
+                }
+                else -> {}
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = onNavigateToTopSubjects,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryOrange,
+                    contentColor   = Color.White
+                )
+            ) {
+                Text("See all recommended subjects", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Vista 3: Subject Occupancy Analytics ──────────────────────────
             Text(
                 text = "Subject Occupancy Analytics",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = OnSurface
+                color = Color.Black
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Text(
                 text = "Sessions per hour and occupancy rate by subject",
                 style = MaterialTheme.typography.labelSmall,
-                color = MediumGray,
+                color = Color.Gray,
                 fontSize = 12.sp
             )
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Occupancy Analytics Content
-            if (isLoadingOccupancy) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = PrimaryOrange)
+            when (val state = occupancyState) {
+                is OccupancyState.Loading -> LoadingBox()
+                is OccupancyState.Error   -> ErrorText(state.message)
+                is OccupancyState.Success -> {
+                    if (state.data.isEmpty()) {
+                        Text(
+                            text = "No occupancy data available",
+                            color = MediumGray,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        state.data.forEach { occupancy ->
+                            OccupancyCard(occupancy = occupancy)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
                 }
-            } else if (occupancyError != null) {
-                Text(
-                    text = occupancyError ?: "Error loading occupancy data",
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else if (occupancyData.isEmpty()) {
-                Text(
-                    text = "No occupancy data available",
-                    color = MediumGray,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                occupancyData.forEach { occupancy ->
-                    OccupancyCard(occupancy = occupancy)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
 
-            // Recommended Subjects Button
-            Button(
-                onClick = onNavigateToTopSubjects,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryOrange,
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = "Recommended Subjects",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+// ── Componentes privados ──────────────────────────────────────────────────────
 
-            Spacer(modifier = Modifier.height(16.dp))
+@Composable
+private fun LoadingBox(height: androidx.compose.ui.unit.Dp = 100.dp) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(height),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = PrimaryOrange)
+    }
+}
 
-            // Logout Button
-            Button(
-                onClick = onLogout,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceVariant,
-                    contentColor = TextColorBlack
-                )
-            ) {
-                Text(
-                    text = "Logout",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+@Composable
+private fun ErrorText(message: String) {
+    Text(
+        text = message,
+        color = Color.Red,
+        fontSize = 13.sp,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    )
+}
 
-            Spacer(modifier = Modifier.height(32.dp))
+@Composable
+private fun SubjectChip(name: String) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xFFFFF3E0),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "•  $name",
+                fontSize = 13.sp,
+                color = Color(0xFFBF360C),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
 
 @Composable
 private fun OccupancyCard(occupancy: TutorOccupancyData) {
-    val occupancyIndicator = when {
+    val indicator = when {
         occupancy.occupancyRate >= 75 -> "🔴"
         occupancy.occupancyRate >= 50 -> "🟡"
         else -> "🟢"
     }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 2.dp),
+        modifier = Modifier.fillMaxWidth().shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = WhiteBase)
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = occupancy.subject,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = OnSurface
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Occupancy General: ${String.format("%.2f", occupancy.occupancyRate)}%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray
-                    )
-                }
-                Text(text = occupancyIndicator, fontSize = 28.sp)
+                Text(
+                    text = occupancy.subject,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(text = indicator, fontSize = 24.sp)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("Sessions/Hour", style = MaterialTheme.typography.labelSmall, color = MediumGray, fontSize = 11.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("%.2f".format(occupancy.sessionsPerHour), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                }
+                Column {
+                    Text("Occupancy Rate", style = MaterialTheme.typography.labelSmall, color = MediumGray, fontSize = 11.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("%.1f%%".format(occupancy.occupancyRate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = PrimaryOrange)
+                }
+                Column {
+                    Text("Total Sessions", style = MaterialTheme.typography.labelSmall, color = MediumGray, fontSize = 11.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(occupancy.totalSessions.toString(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
             LinearProgressIndicator(
                 progress = { (occupancy.occupancyRate / 100.0).toFloat() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp),
+                modifier = Modifier.fillMaxWidth().height(6.dp),
                 color = when {
-                    occupancy.occupancyRate >= 75 -> StatusHighRed
-                    occupancy.occupancyRate >= 50 -> StatusMediumYellow
-                    else -> StatusLowGreen
+                    occupancy.occupancyRate >= 75 -> Color(0xFFE53935)
+                    occupancy.occupancyRate >= 50 -> Color(0xFFFDD835)
+                    else -> Color(0xFF43A047)
                 },
-                trackColor = LightGray,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Sessions/Hour: ${String.format("%.2f", occupancy.sessionsPerHour)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MediumGray
-                )
-                Text(
-                    text = "Total Sesiones: ${occupancy.totalSessions}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MediumGray
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = LightGray, thickness = 1.dp)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (occupancy.highDemand != null) {
-                DemandMetricsRow(
-                    title = "🔴 ALTA DEMANDA",
-                    metrics = occupancy.highDemand,
-                    backgroundColor = Color(0xFFFFEBEE)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            if (occupancy.normalDemand != null) {
-                DemandMetricsRow(
-                    title = "🟢 DEMANDA NORMAL",
-                    metrics = occupancy.normalDemand,
-                    backgroundColor = Color(0xFFF1F8E9)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DemandMetricsRow(
-    title: String,
-    metrics: DemandMetrics,
-    backgroundColor: Color
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = backgroundColor,
-        shadowElevation = 1.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Ocupación",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "${String.format("%.2f", metrics.occupancyRate)}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Sesiones/Hora",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = String.format("%.2f", metrics.sessionsPerHour),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Total Sesiones",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "${metrics.totalSessions ?: 0}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Horas Ocupadas",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MediumGray,
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "${String.format("%.1f", metrics.totalHoursOccupied ?: 0.0)}h",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LinearProgressIndicator(
-                progress = { (metrics.occupancyRate / 100.0).toFloat() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = PrimaryOrange,
-                trackColor = Color.White,
+                trackColor = Color(0xFFE0E0E0)
             )
         }
     }
 }
 
 @Composable
-private fun SessionCard(session: Session, context: Context? = null) {
-    var courseName by remember { mutableStateOf<String?>(null) }
-    var isLoadingCourseName by remember { mutableStateOf(true) }
+private fun SessionCard(session: Session) {
+    val fmt1 = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+    val fmt2 = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    val disp = SimpleDateFormat("MMM d, yyyy - h:mm a", Locale.getDefault())
 
-    LaunchedEffect(session.courseId) {
-        if (context != null && !session.courseId.isNullOrEmpty()) {
-            try {
-                val subjectsApiService = ServiceLocator.subjectsApiService(context)
-                val courseResponse = subjectsApiService.getCourseById(session.courseId ?: "")
-                courseName = courseResponse.course?.name ?: "Unknown Course"
-                isLoadingCourseName = false
-            } catch (e: Exception) {
-                courseName = session.course ?: "Unknown Course"
-                isLoadingCourseName = false
-            }
-        } else {
-            courseName = session.course ?: "Unknown Course"
-            isLoadingCourseName = false
-        }
-    }
-
-    val dateTimeFormatter = try {
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-    } catch (e: Exception) {
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-    }
-    
-    val displayFormatter = SimpleDateFormat("MMM d, yyyy - h:mm a", Locale.getDefault())
-    
     val formattedDateTime = try {
-        val date = dateTimeFormatter.parse(session.scheduledStart)
-        if (date != null) {
-            displayFormatter.format(date)
-        } else {
-            "Date TBD"
-        }
-    } catch (e: Exception) {
-        "Date TBD"
-    }
-    
+        (try { fmt1.parse(session.scheduledStart) } catch (e: Exception) { fmt2.parse(session.scheduledStart) })
+            ?.let { disp.format(it) } ?: "Date TBD"
+    } catch (e: Exception) { "Date TBD" }
+
+    val courseName = session.course ?: session.courseId ?: "Unknown Course"
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 2.dp),
+        modifier = Modifier.fillMaxWidth().shadow(elevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WhiteBase
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = formattedDateTime,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = OnSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                if (isLoadingCourseName) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = PrimaryOrange,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = courseName ?: "Unknown Course",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = PrimaryOrange,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Text(formattedDateTime, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+                Spacer(Modifier.height(8.dp))
+                Text(courseName, style = MaterialTheme.typography.labelSmall, color = PrimaryOrange, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text("Status: ${session.status}", style = MaterialTheme.typography.labelSmall, color = MediumGray)
             }
-
-            Icon(
-                imageVector = Icons.Default.ArrowForward,
-                contentDescription = "View",
-                tint = PrimaryOrange,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "View", tint = PrimaryOrange, modifier = Modifier.size(24.dp))
         }
     }
 }

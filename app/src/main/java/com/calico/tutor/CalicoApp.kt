@@ -1,40 +1,12 @@
 package com.calico.tutor
 
 import android.app.Application
-import com.calico.tutor.di.ServiceLocator
-import java.io.PrintWriter
-import java.io.StringWriter
+import com.calico.tutor.data.worker.PendingAvailabilitiesWorker
 
 class CalicoApp : Application() {
-    
     override fun onCreate() {
         super.onCreate()
-        setupCrashHandler()
-    }
-
-    private fun setupCrashHandler() {
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        val telemetryRepository = ServiceLocator.telemetryRepository(applicationContext)
-
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            try {
-                // Convert stack trace to string
-                val stringWriter = StringWriter()
-                throwable.printStackTrace(PrintWriter(stringWriter))
-                val stackTrace = stringWriter.toString()
-
-                // Send crash report to backend
-                telemetryRepository.reportCrashBlocking(
-                    stackTrace = stackTrace,
-                    feature = "app",
-                    action = "uncaught_exception"
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                // Call the default handler to crash the app normally
-                defaultHandler?.uncaughtException(thread, throwable)
-            }
-        }
+        // Programar sincronización periódica de disponibilidades pendientes (Eventual Connectivity)
+        PendingAvailabilitiesWorker.schedulePeriodicWork(this)
     }
 }
