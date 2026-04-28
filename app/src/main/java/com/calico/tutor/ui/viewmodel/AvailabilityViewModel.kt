@@ -338,8 +338,15 @@ class AvailabilityViewModel(
             val online = isConnected()
 
             // Prevent overlapping availabilities on the frontend
-            val current = (_listState.value as? AvailabilityListState.Success)?.items ?: emptyList()
-            val hasOverlap = current.any { existing ->
+            // Build a merged list that includes pending actions so overlap detection is accurate
+            val baseItems = (_listState.value as? AvailabilityListState.Success)?.items ?: run {
+                when (val r = repository.getAvailabilities(tutorId)) {
+                    is Result.Success -> r.data
+                    else -> emptyList()
+                }
+            }
+            val mergedItems = applyPendingOverlay(baseItems)
+            val hasOverlap = mergedItems.any { existing ->
                 existing.date == request.date && timeOverlap(existing.startTime, existing.endTime, request.startTime, request.endTime)
             }
             if (hasOverlap) {
