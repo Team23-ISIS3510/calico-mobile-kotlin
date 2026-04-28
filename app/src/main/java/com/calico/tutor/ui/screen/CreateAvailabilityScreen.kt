@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calico.tutor.data.dto.request.UpdateAvailabilityRequest
+import com.calico.tutor.data.dto.request.CreateAvailabilityRequest
 import com.calico.tutor.domain.model.AvailabilityItem
 import com.calico.tutor.ui.theme.MediumGray
 import com.calico.tutor.ui.theme.PrimaryOrange
@@ -235,6 +236,16 @@ fun CreateAvailabilityScreen(
                         vm.update(
                             editingItem.id,
                             UpdateAvailabilityRequest(
+                                title = effectiveTitle,
+                                date = date,
+                                startTime = startTime,
+                                endTime = endTime
+                            )
+                        )
+                    } else {
+                        vm.create(
+                            CreateAvailabilityRequest(
+                                tutorId = tutorId,
                                 title = effectiveTitle,
                                 date = date,
                                 startTime = startTime,
