@@ -5,8 +5,9 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <!-- Use deployed backend domain; cleartext not required for HTTPS -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">backend-th7q.onrender.com</domain>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">https://backend-th7q.onrender.com</domain>
+        <domain includeSubdomains="true">10.50.0.233</domain>
+        <domain includeSubdomains="true">localhost</domain>
     </domain-config>
 </network-security-config>
