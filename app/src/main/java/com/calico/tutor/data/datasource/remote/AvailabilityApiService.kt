@@ -30,7 +30,7 @@ interface AvailabilityApiService {
         @Body request: UpdateAvailabilityRequest
     ): Response<AvailabilityMutationResponse>
 
-    // DELETE /availability/tutor/:tutorId
-    @DELETE("availability/tutor/{tutorId}")
-    suspend fun deleteAvailabilitiesByTutor(@Path("tutorId") tutorId: String): Response<Unit>
+    // DELETE /availability/:availabilityId
+    @DELETE("availability/{availabilityId}")
+    suspend fun deleteAvailability(@Path("availabilityId") availabilityId: String): Response<Unit>
 }

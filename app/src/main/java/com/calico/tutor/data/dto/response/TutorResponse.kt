@@ -21,6 +21,8 @@ data class TutorResponse(
     val courses: List<String>? = null,
     @SerializedName("profileImage")
     val profileImage: String? = null,
+    @SerializedName("profilePictureUrl")
+    val profilePictureUrl: String? = null,
     @SerializedName("location")
     val location: String? = null,
     @SerializedName("totalAvailabilities")

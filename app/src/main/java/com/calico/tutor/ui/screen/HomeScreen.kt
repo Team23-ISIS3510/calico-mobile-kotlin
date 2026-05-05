@@ -54,8 +54,17 @@ fun HomeScreen(
     val tutorName      by vm.tutorName.collectAsState()
 
     LaunchedEffect(tutorId) {
+        vm.onHomepageOpened()
         vm.loadAllData(tutorId)
         vm.startSessionAlertPolling()
+        vm.startConnectivityMonitoring(tutorId)
+    }
+
+    LaunchedEffect(sessionsState, subjectsState) {
+        vm.onHomepageContentRendered(
+            isSessionsReady    = sessionsState is SessionsState.Success,
+            isTopSubjectsReady = subjectsState is SubjectsState.Success
+        )
     }
 
     val displayName = tutorName.ifBlank { userName }
@@ -198,20 +207,6 @@ fun HomeScreen(
                 )
             ) {
                 Text("See all recommended subjects", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE0E0E0),
-                    contentColor   = Color.Black
-                )
-            ) {
-                Text("Logout", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(32.dp))

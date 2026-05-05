@@ -1,6 +1,10 @@
 package com.calico.tutor.ui.viewmodel
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,6 +16,7 @@ import com.calico.tutor.data.dto.response.TutoringSessionData
 import com.calico.tutor.data.local.CacheDatabase
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
+import com.calico.tutor.util.JwtUtils
 import com.calico.tutor.util.NotificationHelper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -101,11 +106,41 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     private val userPrefs    = ServiceLocator.userPreferences(context)
     private val memoryCache  = ServiceLocator.inMemoryCache()
     private val fileManager  = ServiceLocator.fileManager(context)
+    private val telemetryRepository = ServiceLocator.telemetryRepository(context)
+    private val tokenManager = ServiceLocator.provideTokenManager(context)
     private val gson         = Gson()
 
     private val shownNotifications        = mutableSetOf<String>()
     private var lastConnectionWarningTime = 0L
     private val CONNECTION_WARNING_COOLDOWN_MS = 300_000L
+    private var homepageLoadStartMs: Long = 0L
+    private var homepageLoadReported = false
+
+    fun onHomepageOpened() {
+        homepageLoadStartMs = System.currentTimeMillis()
+        homepageLoadReported = false
+    }
+
+    fun onHomepageContentRendered(isSessionsReady: Boolean, isTopSubjectsReady: Boolean) {
+        if (!isSessionsReady || !isTopSubjectsReady || homepageLoadReported) return
+        if (homepageLoadStartMs <= 0L) return
+
+        val loadTimeMs = System.currentTimeMillis() - homepageLoadStartMs
+        val connectivityStatus = if (isDeviceOnline()) "online" else "offline"
+        val firebaseUid = tokenManager.getIdToken()?.let { JwtUtils.extractFirebaseUid(it) }
+
+        homepageLoadReported = true
+        telemetryRepository.reportHomepageLoad(
+            loadTimeMs = loadTimeMs,
+            connectivityStatus = connectivityStatus,
+            userId = firebaseUid
+        )
+        Log.d(TAG, "Homepage telemetry sent: load_time_ms=$loadTimeMs, connectivity_status=$connectivityStatus, user_id=${firebaseUid ?: "null"}")
+    }
+
+    // Connectivity monitoring for auto-refresh
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var monitoredTutorId: String = ""
 
     // ─────────────────────────────────────────────────────────────────────────
     // MULTI-THREADING: carga paralela con corrutinas anidadas
@@ -146,6 +181,49 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     }
 
     fun refreshData(tutorId: String) = loadAllData(tutorId)
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // EVENTUAL CONNECTIVITY: auto-refresh when network returns
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Registers a ConnectivityManager callback that reloads data whenever the
+     * device regains internet access and the home data is missing or in error.
+     * Must be called once from the composable's LaunchedEffect.
+     */
+    fun startConnectivityMonitoring(tutorId: String) {
+        if (networkCallback != null) return   // already registered
+        monitoredTutorId = tutorId
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val req = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val needsLoad = _sessionsState.value is SessionsState.Error ||
+                    _sessionsState.value is SessionsState.Idle ||
+                    _occupancyState.value is OccupancyState.Error ||
+                    _subjectsState.value is SubjectsState.Error
+                if (needsLoad) {
+                    viewModelScope.launch(Dispatchers.Main) {
+                        Log.d(TAG, "Connectivity restored — reloading home data")
+                        loadAllData(monitoredTutorId)
+                    }
+                }
+            }
+        }
+        cm.registerNetworkCallback(req, networkCallback!!)
+        Log.d(TAG, "Connectivity monitoring started for $tutorId")
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        networkCallback?.let { cb ->
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            try { cm.unregisterNetworkCallback(cb) } catch (_: Exception) {}
+        }
+        networkCallback = null
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // FETCH HELPERS — se ejecutan en Dispatchers.IO via async(IO)
@@ -358,6 +436,14 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
         }
         latencies.average().toLong()
     } catch (e: Exception) { 2000L }
+
+    private fun isDeviceOnline(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val activeNetwork = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // HELPERS DE MAPEO

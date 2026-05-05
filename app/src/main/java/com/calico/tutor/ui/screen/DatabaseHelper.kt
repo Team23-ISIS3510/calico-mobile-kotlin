@@ -5,12 +5,13 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.content.ContentValues
 import android.database.Cursor
+import android.util.Log
 
 class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         private const val DATABASE_NAME = "app_database.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 5
 
         const val TABLE_COURSES = "courses"
         const val TABLE_APPROVED_COURSES = "approved_courses"
@@ -30,6 +31,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private val CREATE_TABLE_COURSES = (
             "CREATE TABLE $TABLE_COURSES ("
             + "$COLUMN_COURSE_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+            + "api_id TEXT, "
             + "$COLUMN_COURSE_TITLE TEXT NOT NULL, "
             + "$COLUMN_COURSE_DESCRIPTION TEXT, "
             + "$COLUMN_COURSE_CATEGORY TEXT"
@@ -56,12 +58,26 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             + ")"
         )
 
-        private val CREATE_TABLE_TUTOR_PROFILE = (
+        private const val TABLE_PENDING_APPLICATIONS = "pending_applications"
+
+        private val CREATE_TABLE_PENDING_APPLICATIONS = (
+            "CREATE TABLE $TABLE_PENDING_APPLICATIONS ("
+            + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            + "course_id TEXT, "
+            + "course_name TEXT, "
+            + "course_code TEXT, "
+            + "notes TEXT, "
+            + "created_at TEXT"
+            + ")"
+        )
+
+private val CREATE_TABLE_TUTOR_PROFILE = (
             "CREATE TABLE $TABLE_TUTOR_PROFILE ("
             + "$COLUMN_TUTOR_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
             + "$COLUMN_TUTOR_NAME TEXT NOT NULL, "
             + "$COLUMN_TUTOR_EMAIL TEXT NOT NULL, "
-            + "$COLUMN_TUTOR_SUBJECT TEXT"
+            + "$COLUMN_TUTOR_SUBJECT TEXT, "
+            + "profile_image_url TEXT"
             + ")"
         )
     }
@@ -70,6 +86,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db?.execSQL(CREATE_TABLE_COURSES)
         db?.execSQL(CREATE_TABLE_APPROVED_COURSES)
         db?.execSQL(CREATE_TABLE_APPLICATIONS)
+        db?.execSQL(CREATE_TABLE_PENDING_APPLICATIONS)
         db?.execSQL(CREATE_TABLE_TUTOR_PROFILE)
     }
 
@@ -77,6 +94,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_COURSES")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_APPROVED_COURSES")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_APPLICATIONS")
+        db?.execSQL("DROP TABLE IF EXISTS $TABLE_PENDING_APPLICATIONS")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_TUTOR_PROFILE")
         onCreate(db)
     }
@@ -88,6 +106,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             db.delete(TABLE_COURSES, null, null)
             for (course in courses) {
                 val values = ContentValues().apply {
+                    put("api_id", course.apiId)
                     put(COLUMN_COURSE_TITLE, course.title)
                     put(COLUMN_COURSE_DESCRIPTION, course.description)
                     put(COLUMN_COURSE_CATEGORY, course.category)
@@ -116,8 +135,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
         cursor?.use {
             while (it.moveToNext()) {
+                val apiIdCol = it.getColumnIndex("api_id")
+                val apiId = if (apiIdCol >= 0) it.getString(apiIdCol) else null
                 val course = Course(
                     id = it.getLong(it.getColumnIndexOrThrow(COLUMN_COURSE_ID)),
+                    apiId = apiId,
                     title = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_TITLE)),
                     description = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_DESCRIPTION)),
                     category = it.getString(it.getColumnIndexOrThrow(COLUMN_COURSE_CATEGORY))
@@ -189,6 +211,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     data class Course(
         val id: Long = 0,
+        val apiId: String? = null,
         val title: String,
         val description: String? = null,
         val category: String? = null
@@ -196,10 +219,12 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     fun saveTutorProfile(tutor: TutorProfile): Long {
         val db = this.writableDatabase
+        db.delete(TABLE_TUTOR_PROFILE, null, null)
         val values = ContentValues().apply {
             put(COLUMN_TUTOR_NAME, tutor.name)
             put(COLUMN_TUTOR_EMAIL, tutor.email)
             put(COLUMN_TUTOR_SUBJECT, tutor.subject)
+            put("profile_image_url", tutor.profileImageUrl)
         }
         return db.insert(TABLE_TUTOR_PROFILE, null, values).also { db.close() }
     }
@@ -223,7 +248,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     id = it.getLong(it.getColumnIndexOrThrow(COLUMN_TUTOR_ID)),
                     name = it.getString(it.getColumnIndexOrThrow(COLUMN_TUTOR_NAME)),
                     email = it.getString(it.getColumnIndexOrThrow(COLUMN_TUTOR_EMAIL)),
-                    subject = it.getString(it.getColumnIndexOrThrow(COLUMN_TUTOR_SUBJECT))
+                    subject = it.getString(it.getColumnIndexOrThrow(COLUMN_TUTOR_SUBJECT)),
+                    profileImageUrl = it.getString(it.getColumnIndexOrThrow("profile_image_url"))
                 )
                 tutors.add(tutor)
             }
@@ -236,7 +262,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         val id: Long = 0,
         val name: String,
         val email: String,
-        val subject: String? = null
+        val subject: String? = null,
+        val profileImageUrl: String? = null
     )
 
     data class Application(
@@ -298,5 +325,73 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         db.close()
         return applications
+    }
+
+    data class PendingApplication(
+        val id: Long = 0,
+        val courseId: String,
+        val courseName: String,
+        val courseCode: String,
+        val notes: String? = null,
+        val createdAt: String
+    )
+
+    fun savePendingApplication(app: PendingApplication): Long {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put("course_id", app.courseId)
+            put("course_name", app.courseName)
+            put("course_code", app.courseCode)
+            put("notes", app.notes)
+            put("created_at", app.createdAt)
+        }
+        return db.insert(TABLE_PENDING_APPLICATIONS, null, values).also { db.close() }
+    }
+
+    fun getPendingApplications(): List<PendingApplication> {
+        val applications = mutableListOf<PendingApplication>()
+        val db = this.readableDatabase
+        val cursor: Cursor? = db.query(
+            TABLE_PENDING_APPLICATIONS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "created_at ASC"
+        )
+
+        cursor?.use {
+            while (it.moveToNext()) {
+                val app = PendingApplication(
+                    id = it.getLong(it.getColumnIndexOrThrow("id")),
+                    courseId = it.getString(it.getColumnIndexOrThrow("course_id")),
+                    courseName = it.getString(it.getColumnIndexOrThrow("course_name")),
+                    courseCode = it.getString(it.getColumnIndexOrThrow("course_code")),
+                    notes = it.getString(it.getColumnIndexOrThrow("notes")),
+                    createdAt = it.getString(it.getColumnIndexOrThrow("created_at"))
+                )
+                applications.add(app)
+            }
+        }
+        db.close()
+        return applications
+    }
+
+    fun deletePendingApplication(id: Long) {
+        val db = this.writableDatabase
+        db.delete(TABLE_PENDING_APPLICATIONS, "id = ?", arrayOf(id.toString()))
+        db.close()
+    }
+
+    fun clearAllTables() {
+        Log.d("DB", "Clearing DB")
+        val db = this.writableDatabase
+        db.delete(TABLE_COURSES, null, null)
+        db.delete(TABLE_APPROVED_COURSES, null, null)
+        db.delete(TABLE_APPLICATIONS, null, null)
+        db.delete(TABLE_TUTOR_PROFILE, null, null)
+        db.close()
+        Log.d("DB", "DB Cleared")
     }
 }
