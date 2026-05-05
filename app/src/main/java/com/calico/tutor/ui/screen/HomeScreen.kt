@@ -21,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.calico.tutor.R
 import com.calico.tutor.data.dto.response.CourseData
 import com.calico.tutor.data.dto.response.TutorOccupancyData
@@ -39,6 +42,7 @@ fun HomeScreen(
     userName: String = "User",
     tutorId: String = "tutor@example.com",
     context: Context? = null,
+    logoUrl: String? = null,
     onLogout: () -> Unit = {},
     onNavigateToTopSubjects: () -> Unit = {}
 ) {
@@ -83,11 +87,28 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Image(
-                    painter = painterResource(id = R.drawable.calico_logo),
-                    contentDescription = "Calico Logo",
-                    modifier = Modifier.size(120.dp)
-                )
+                val trimmedLogoUrl = logoUrl?.trim().orEmpty()
+                if (trimmedLogoUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(trimmedLogoUrl)
+                            .crossfade(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .networkCachePolicy(CachePolicy.ENABLED)
+                            .build(),
+                        contentDescription = "Calico Logo",
+                        modifier = Modifier.size(120.dp),
+                        placeholder = painterResource(id = R.drawable.calico_logo),
+                        error = painterResource(id = R.drawable.calico_logo)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.calico_logo),
+                        contentDescription = "Calico Logo",
+                        modifier = Modifier.size(120.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
