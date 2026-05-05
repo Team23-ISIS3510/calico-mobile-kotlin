@@ -32,6 +32,7 @@ fun MainScreen(
     var editingItem by remember { mutableStateOf<AvailabilityItem?>(null) }
     var showTopSubjects by remember { mutableStateOf(false) }
     var showHotSlots by remember { mutableStateOf(false) }
+    val remoteLogoUrl = "https://drive.google.com/uc?export=view&id=1GSBZCG-KGNDq2lHk3VpVR_88lmHmEjy8"
 
     val navItems = listOf(
         NavBarItem("Home", Icons.Default.Home, "home"),
@@ -88,6 +89,7 @@ fun MainScreen(
                             userName = userName,
                             tutorId = tutorId,
                             context = context,
+                            logoUrl = remoteLogoUrl,
                             onLogout = onLogout,
                             onNavigateToTopSubjects = { showTopSubjects = true }
                         )
