@@ -337,6 +337,23 @@ class AvailabilityViewModel(
             _actionState.value = AvailabilityActionState.Loading
             val online = isConnected()
 
+            // Prevent overlapping availabilities on the frontend
+            // Build a merged list that includes pending actions so overlap detection is accurate
+            val baseItems = (_listState.value as? AvailabilityListState.Success)?.items ?: run {
+                when (val r = repository.getAvailabilities(tutorId)) {
+                    is Result.Success -> r.data
+                    else -> emptyList()
+                }
+            }
+            val mergedItems = applyPendingOverlay(baseItems)
+            val hasOverlap = mergedItems.any { existing ->
+                existing.date == request.date && timeOverlap(existing.startTime, existing.endTime, request.startTime, request.endTime)
+            }
+            if (hasOverlap) {
+                _actionState.value = AvailabilityActionState.Error("Ya existe una disponibilidad en ese horario")
+                return@launch
+            }
+
             val pendingId = cacheDb.savePending(gson.toJson(request), CacheDatabase.ACTION_CREATE)
             fileManager.appendLog("CREATE queued id=$pendingId tutorId=$tutorId")
             applyLocalCreate(request)
@@ -365,6 +382,26 @@ class AvailabilityViewModel(
                 }
             }
         }
+    }
+
+    private fun timeOverlap(startA: String, endA: String, startB: String, endB: String): Boolean {
+        // Assumes format HH:mm (24h). Convert to minutes since midnight.
+        fun toMinutes(t: String): Int {
+            return try {
+                val parts = t.split(":")
+                val h = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                h * 60 + m
+            } catch (e: Exception) { 0 }
+        }
+
+        val aStart = toMinutes(startA)
+        val aEnd = toMinutes(endA)
+        val bStart = toMinutes(startB)
+        val bEnd = toMinutes(endB)
+
+        if (aEnd <= aStart || bEnd <= bStart) return false
+        return aStart < bEnd && bStart < aEnd
     }
 
     fun update(id: String, request: UpdateAvailabilityRequest) {
