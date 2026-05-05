@@ -12,10 +12,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.AvailabilityItem
 import com.calico.tutor.ui.component.BottomNavBar
 import com.calico.tutor.ui.component.NavBarItem
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.viewmodel.HotSlotsViewModel
 import com.calico.tutor.ui.viewmodel.ProfileViewModel
 
 @Composable
@@ -29,6 +31,7 @@ fun MainScreen(
     var currentRoute by remember { mutableStateOf("home") }
     var editingItem by remember { mutableStateOf<AvailabilityItem?>(null) }
     var showTopSubjects by remember { mutableStateOf(false) }
+    var showHotSlots by remember { mutableStateOf(false) }
 
     val navItems = listOf(
         NavBarItem("Home", Icons.Default.Home, "home"),
@@ -42,6 +45,16 @@ fun MainScreen(
             TopSubjectsScreen(
                 context = context,
                 onNavigateBack = { showTopSubjects = false }
+            )
+        }
+        showHotSlots -> {
+            HotSlotsRecommendationScreen(
+                viewModel = remember {
+                    val useCase = ServiceLocator.getHotSlotsAnalysisUseCase(context)
+                    HotSlotsViewModel(useCase)
+                },
+                tutorId = tutorId,
+                onDismiss = { showHotSlots = false }
             )
         }
         currentRoute == "availability_edit" -> {
@@ -89,6 +102,9 @@ fun MainScreen(
                             onNavigateToEdit = { item ->
                                 editingItem = item
                                 currentRoute = "availability_edit"
+                            },
+                            onNavigateToHotSlots = {
+                                showHotSlots = true
                             }
                         )
                         "profile" -> ProfileScreen(

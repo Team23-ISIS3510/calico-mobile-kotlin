@@ -74,7 +74,8 @@ enum class RepeatOption(val label: String) {
 fun AvailabilityScreen(
     context: Context,
     tutorId: String,
-    onNavigateToEdit: (AvailabilityItem) -> Unit
+    onNavigateToEdit: (AvailabilityItem) -> Unit,
+    onNavigateToHotSlots: () -> Unit = {}
 ) {
     val vm: AvailabilityViewModel = viewModel(
         key = "availability_$tutorId",
@@ -167,7 +168,7 @@ fun AvailabilityScreen(
             }
 
             when (selectedTab) {
-                0 -> SeeAvailabilitiesTab(listState, vm, onNavigateToEdit)
+                0 -> SeeAvailabilitiesTab(listState, vm, onNavigateToEdit, onNavigateToHotSlots, tutorId)
                 1 -> when (createStep) {
                     0 -> CalendarStep(
                         selectedDate = selectedDate,
@@ -268,7 +269,9 @@ private fun AvailabilityTabItem(
 private fun SeeAvailabilitiesTab(
     listState: AvailabilityListState,
     vm: AvailabilityViewModel,
-    onNavigateToEdit: (AvailabilityItem) -> Unit
+    onNavigateToEdit: (AvailabilityItem) -> Unit,
+    onNavigateToHotSlots: () -> Unit,
+    tutorId: String
 ) {
     when (listState) {
         is AvailabilityListState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -288,28 +291,75 @@ private fun SeeAvailabilitiesTab(
         }
         is AvailabilityListState.Success -> {
             val grouped = groupByDay(listState.items)
-            if (grouped.isEmpty()) {
-                Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text("No upcoming availabilities", color = MediumGray, fontSize = 14.sp,
-                        textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
-                ) {
-                    grouped.forEach { (label, dayItems) ->
-                        item {
-                            Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                                color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Hot Slots Recommendation Banner
+                if (grouped.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text("No upcoming availabilities", color = MediumGray, fontSize = 14.sp,
+                                textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
+                            Spacer(Modifier.height(16.dp))
+                            Button(
+                                onClick = onNavigateToHotSlots,
+                                modifier = Modifier
+                                    .fillMaxWidth(0.75f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = PrimaryOrange
+                                )
+                            ) {
+                                Text("🔥 View Hot Slots", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
                         }
-                        items(dayItems) { item ->
-                            AvailabilityCard(
-                                item    = item,
-                                onEdit  = { onNavigateToEdit(item) },
-                                onDelete = { vm.deleteAvailability(item.id) }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
+                    ) {
+                        grouped.forEach { (label, dayItems) ->
+                            item {
+                                Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                    color = MediumGray, modifier = Modifier.padding(vertical = 8.dp))
+                            }
+                            items(dayItems) { item ->
+                                AvailabilityCard(
+                                    item    = item,
+                                    onEdit  = { onNavigateToEdit(item) },
+                                    onDelete = { vm.deleteAvailability(item.id) }
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+
+                    // Hot Slots Button at bottom
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Button(
+                            onClick = onNavigateToHotSlots,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryOrange
                             )
-                            Spacer(Modifier.height(8.dp))
+                        ) {
+                            Text("🔥 View Hot Slots Recommendations", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
                 }

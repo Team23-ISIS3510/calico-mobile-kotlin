@@ -24,6 +24,7 @@ import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
 import com.calico.tutor.domain.usecase.GoogleLoginUseCase
 import com.calico.tutor.domain.usecase.ClearTokenUseCase
+import com.calico.tutor.domain.usecase.GetHotSlotsAnalysisUseCase
 import com.calico.tutor.ui.screen.DatabaseHelper
 
 object ServiceLocator {
@@ -154,6 +155,9 @@ object ServiceLocator {
 
     fun clearTokenUseCase(context: Context): ClearTokenUseCase =
         ClearTokenUseCase(authRepository(context))
+
+    fun getHotSlotsAnalysisUseCase(context: Context): GetHotSlotsAnalysisUseCase =
+        GetHotSlotsAnalysisUseCase(availabilityRepository(context))
 
     fun analyticsApiService(context: Context): AnalyticsApiService {
         return _analyticsApiService ?: synchronized(this) {

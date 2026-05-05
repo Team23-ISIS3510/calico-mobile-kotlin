@@ -4,7 +4,9 @@ import android.util.Log
 import com.calico.tutor.data.datasource.remote.AvailabilityApiService
 import com.calico.tutor.data.dto.request.CreateAvailabilityRequest
 import com.calico.tutor.data.dto.request.UpdateAvailabilityRequest
+import com.calico.tutor.data.mapper.toDomain
 import com.calico.tutor.domain.model.AvailabilityItem
+import com.calico.tutor.domain.model.HotSlotsAnalysis
 import com.calico.tutor.domain.repository.AvailabilityRepository
 import com.calico.tutor.domain.utils.Result
 import retrofit2.HttpException
@@ -112,6 +114,21 @@ class AvailabilityRepositoryImpl(
         } catch (e: Exception) {
             Log.e(TAG, "Error eliminando disponibilidad: ${e.message}", e)
             Result.Error(e, "Server error. Please try again later")
+        }
+    }
+
+    override suspend fun getHotSlotsAnalysis(tutorId: String): Result<HotSlotsAnalysis> {
+        return try {
+            Log.d(TAG, "Cargando análisis de hot slots para tutor: $tutorId")
+            val response = apiService.getHotSlotsAnalysis(tutorId)
+            Log.d(TAG, "Hot slots obtenidos: ${response.hotSlots.size} slots")
+            Result.Success(response.toDomain())
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP ${e.code()} cargando hot slots: ${e.message()}", e)
+            Result.Error(e, "Error del servidor (${e.code()})")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cargando hot slots: ${e.message}", e)
+            Result.Error(e, e.localizedMessage ?: "Error cargando hot slots")
         }
     }
 
