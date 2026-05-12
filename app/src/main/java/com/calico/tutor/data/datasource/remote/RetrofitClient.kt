@@ -28,12 +28,12 @@ object RetrofitClient {
         return retrofit.create(SubjectsApiService::class.java)
     }
 
-    fun createUsersApiService(retrofit: Retrofit): UsersApiService {
-        return retrofit.create(UsersApiService::class.java)
-    }
-
     fun createAvailabilityApiService(retrofit: Retrofit): AvailabilityApiService {
         return retrofit.create(AvailabilityApiService::class.java)
+    }
+
+    fun createUsersApiService(retrofit: Retrofit): UsersApiService {
+        return retrofit.create(UsersApiService::class.java)
     }
 
     fun createAnalyticsApiService(retrofit: Retrofit): AnalyticsApiService {

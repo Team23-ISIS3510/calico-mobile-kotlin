@@ -16,11 +16,22 @@ val envProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
-val googleWebClientId = localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")?.trim().orEmpty()
+val googleWebClientId = (
+    localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")
+        ?: envProperties.getProperty("GOOGLE_CLIENT_ID_ANDROID")
+        ?: envProperties.getProperty("GOOGLE_CLIENT_ID")
+    )?.trim().orEmpty()
+
 val firebaseApiKey = (
     localProperties.getProperty("FIREBASE_API_KEY")
         ?: envProperties.getProperty("FIREBASE_API_KEY")
     )?.trim().orEmpty()
+
+val apiBaseUrl = (
+    localProperties.getProperty("API_BASE_URL")
+        ?: envProperties.getProperty("API_BASE_URL")
+        ?: "http://10.0.2.2:3000/"
+    ).trim()
 
 // Optional: Firebase API key for development builds
 if (googleWebClientId.isBlank()) {
@@ -54,6 +65,12 @@ android {
             "String",
             "FIREBASE_API_KEY",
             "\"$firebaseApiKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "BASE_URL",
+            "\"$apiBaseUrl\""
         )
 
         resValue("string", "google_web_client_id", googleWebClientId)
