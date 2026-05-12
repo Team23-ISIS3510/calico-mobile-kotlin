@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -38,6 +39,7 @@ fun MainScreen(
         NavBarItem("Home", Icons.Default.Home, "home"),
         NavBarItem("Courses", Icons.Default.Search, "courses"),
         NavBarItem("Availability", Icons.Default.DateRange, "availability"),
+        NavBarItem("History", Icons.Default.History, "history"),
         NavBarItem("Profile", Icons.Default.Person, "profile"),
     )
 
@@ -45,6 +47,7 @@ fun MainScreen(
         showTopSubjects -> {
             TopSubjectsScreen(
                 context = context,
+                tutorId = tutorId,
                 onNavigateBack = { showTopSubjects = false }
             )
         }
@@ -108,6 +111,11 @@ fun MainScreen(
                             onNavigateToHotSlots = {
                                 showHotSlots = true
                             }
+                        )
+                        "history" -> HistoryScreen(
+                            context = context,
+                            tutorId = tutorId,
+                            onNavigateBack = { currentRoute = "home" }
                         )
                         "profile" -> ProfileScreen(
                             viewModel = remember { ProfileViewModel(context) },

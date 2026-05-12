@@ -320,7 +320,7 @@ class AvailabilityViewModel(
                         memoryCache.put(cacheKey, mergedItems)
                         _listState.value = AvailabilityListState.Success(mergedItems)
                     } else {
-                        _listState.value = AvailabilityListState.Error("No hay datos disponibles")
+                        _listState.value = AvailabilityListState.Error("No data available")
                     }
                 }
                 is Result.Loading -> _listState.value = AvailabilityListState.Loading
@@ -350,7 +350,7 @@ class AvailabilityViewModel(
                 existing.date == request.date && timeOverlap(existing.startTime, existing.endTime, request.startTime, request.endTime)
             }
             if (hasOverlap) {
-                _actionState.value = AvailabilityActionState.Error("Ya existe una disponibilidad en ese horario")
+                _actionState.value = AvailabilityActionState.Error("An availability already exists for that time slot")
                 return@launch
             }
 

@@ -7,6 +7,7 @@ import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.AvailabilityApiService
+import com.calico.tutor.data.datasource.remote.UsersApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.local.CacheDatabase
@@ -68,6 +69,8 @@ object ServiceLocator {
     @Volatile
     private var subjectsApiService: SubjectsApiService? = null
     @Volatile
+    private var usersApiService: UsersApiService? = null
+    @Volatile
     private var availabilityApiService: AvailabilityApiService? = null
     @Volatile
     private var _analyticsApiService: AnalyticsApiService? = null
@@ -114,6 +117,16 @@ object ServiceLocator {
                     RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
                 )
             ).also { subjectsApiService = it }
+        }
+    }
+
+    fun usersApiService(context: Context): UsersApiService {
+        return usersApiService ?: synchronized(this) {
+            usersApiService ?: RetrofitClient.createUsersApiService(
+                RetrofitClient.createRetrofit(
+                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                )
+            ).also { usersApiService = it }
         }
     }
 

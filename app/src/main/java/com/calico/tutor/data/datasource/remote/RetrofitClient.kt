@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://10.50.0.233:3000/"
+    private const val BASE_URL = "http://192.168.1.76:3000/"
 
     fun createRetrofit(
         httpClient: OkHttpClient = createHttpClient(null)
@@ -26,6 +26,10 @@ object RetrofitClient {
 
     fun createSubjectsApiService(retrofit: Retrofit): SubjectsApiService {
         return retrofit.create(SubjectsApiService::class.java)
+    }
+
+    fun createUsersApiService(retrofit: Retrofit): UsersApiService {
+        return retrofit.create(UsersApiService::class.java)
     }
 
     fun createAvailabilityApiService(retrofit: Retrofit): AvailabilityApiService {

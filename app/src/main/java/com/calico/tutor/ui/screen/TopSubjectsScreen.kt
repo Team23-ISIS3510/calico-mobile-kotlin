@@ -1,14 +1,40 @@
 package com.calico.tutor.ui.screen
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -16,10 +42,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.calico.tutor.di.ServiceLocator
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calico.tutor.domain.model.Subject
-import com.calico.tutor.ui.theme.*
-import android.content.Context
+import com.calico.tutor.ui.component.OfflineBanner
+import com.calico.tutor.ui.theme.MediumGray
+import com.calico.tutor.ui.theme.OnSurface
+import com.calico.tutor.ui.theme.PrimaryOrange
+import com.calico.tutor.ui.theme.SurfaceVariant
+import com.calico.tutor.ui.theme.WhiteBase
+import com.calico.tutor.ui.viewmodel.RecommendedSubjectsViewModel
+import com.calico.tutor.ui.viewmodel.RecommendedSubjectsViewModelFactory
+import com.calico.tutor.ui.viewmodel.SubjectsState
+
+private const val GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScYXCyv0jDJ-lzzhrb2q2qha8qgG4YnKB0tky-cIc0Oz-w9rQ/viewform?usp=header"
 
 data class SubjectFrequency(
     val subject: Subject,
@@ -29,51 +64,48 @@ data class SubjectFrequency(
 @Composable
 fun TopSubjectsScreen(
     context: Context,
+    tutorId: String,
     onNavigateBack: () -> Unit = {}
 ) {
-    var topSubjects by remember { mutableStateOf<List<SubjectFrequency>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val viewModel: RecommendedSubjectsViewModel = viewModel(
+        factory = RecommendedSubjectsViewModelFactory(context)
+    )
+    val subjectsState by viewModel.subjectsState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
-    LaunchedEffect(Unit) {
-        try {
-            val subjectsApiService = ServiceLocator.subjectsApiService(context)
-            val response = subjectsApiService.getSubjectsHistory()
-            
-            // Process data from the endpoint
-            if (response.data != null) {
-                // Group by courseId to get frequencies
-                val courseFrequencyMap = mutableMapOf<String, Pair<String, Int>>()
-                
-                response.data.forEach { courseData ->
+    LaunchedEffect(tutorId) {
+        viewModel.loadData(tutorId)
+        viewModel.startConnectivityMonitoring(tutorId)
+    }
+
+    val topSubjects: List<SubjectFrequency> = remember(subjectsState) {
+        when (val state = subjectsState) {
+            is SubjectsState.Success -> {
+                val courseMap = linkedMapOf<String, Pair<String, Int>>()
+                state.subjects.forEach { courseData ->
                     val courseId = courseData.courseId
                     val courseName = courseData.course ?: "Unnamed"
-                    
-                    if (courseFrequencyMap.containsKey(courseId)) {
-                        val (name, count) = courseFrequencyMap[courseId]!!
-                        courseFrequencyMap[courseId] = Pair(name, count + 1)
+                    val current = courseMap[courseId]
+                    courseMap[courseId] = if (current == null) {
+                        courseName to 1
                     } else {
-                        courseFrequencyMap[courseId] = Pair(courseName, 1)
+                        current.first to (current.second + 1)
                     }
                 }
-                
-                // Convert to SubjectFrequency and sort by frequency (top 3)
-                topSubjects = courseFrequencyMap.entries.map { (courseId, nameAndCount) ->
-                    val subject = Subject(
-                        id = courseId,
-                        name = nameAndCount.first,
-                        code = courseId.take(4).uppercase(),
-                        count = nameAndCount.second
+
+                courseMap.entries.map { (courseId, nameAndCount) ->
+                    SubjectFrequency(
+                        subject = Subject(
+                            id = courseId,
+                            name = nameAndCount.first,
+                            code = courseId.take(4).uppercase(),
+                            count = nameAndCount.second
+                        ),
+                        frequency = nameAndCount.second
                     )
-                    SubjectFrequency(subject, nameAndCount.second)
-                }.sortedByDescending { it.frequency }
-                    .take(3)
+                }.sortedByDescending { it.frequency }.take(3)
             }
-            
-            isLoading = false
-        } catch (e: Exception) {
-            error = "Error loading subjects: ${e.message}"
-            isLoading = false
+            else -> emptyList()
         }
     }
 
@@ -82,15 +114,12 @@ fun TopSubjectsScreen(
             .fillMaxSize()
             .background(Color.White)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header with back arrow
+        Column(modifier = Modifier.fillMaxSize()) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(elevation = 4.dp),
-                color = Color.White
+                color = WhiteBase
             ) {
                 Row(
                     modifier = Modifier
@@ -102,101 +131,134 @@ fun TopSubjectsScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.Black
+                            tint = OnSurface
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Top 3 Subjects",
+                        text = "Recommended Subjects",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = OnSurface
                     )
                 }
             }
 
-            // Content
+            // Show offline banner when not connected
+            if (!isOnline) {
+                OfflineBanner()
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp)
+                    .padding(16.dp)
             ) {
-                if (isLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = PrimaryOrange
-                        )
-                    }
-                } else if (error != null) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(elevation = 2.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFFEBEE)
-                        )
-                    ) {
-                        Text(
-                            text = error ?: "Unknown error",
-                            modifier = Modifier.padding(16.dp),
-                            color = Color(0xFFC62828),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                } else if (topSubjects.isEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(elevation = 2.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF5F5F5)
-                        )
-                    ) {
-                        Text(
-                            text = "No subjects available",
-                            modifier = Modifier.padding(16.dp),
-                            color = MediumGray,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                } else {
-                    topSubjects.forEachIndexed { index, subjectFreq ->
-                        TopSubjectCard(
-                            ranking = index + 1,
-                            subject = subjectFreq.subject.name,
-                            frequency = subjectFreq.frequency
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                when (val state = subjectsState) {
+                    SubjectsState.Loading, SubjectsState.Idle -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = PrimaryOrange)
+                        }
+                    }
+                    is SubjectsState.Error -> {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                        ) {
+                            Text(
+                                text = state.message,
+                                modifier = Modifier.padding(16.dp),
+                                color = Color(0xFFC62828),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    is SubjectsState.Success -> {
+                        if (topSubjects.isEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+                            ) {
+                                Text(
+                                    text = "No recommended subjects available.",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = MediumGray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Top 3 Recommended Subjects",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = OnSurface
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                    // Apply Button
-                    Button(
-                        onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryOrange,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = "Apply Now",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                            topSubjects.forEach { subject ->
+                                RecommendedSubjectItem(subject = subject.subject)
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            Button(
+                                onClick = {
+                                    if (isOnline) {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GOOGLE_FORM_URL)).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                enabled = isOnline,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isOnline) PrimaryOrange else Color(0xFFCCCCCC),
+                                    contentColor = if (isOnline) WhiteBase else Color(0xFF999999),
+                                    disabledContainerColor = Color(0xFFCCCCCC),
+                                    disabledContentColor = Color(0xFF999999)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (!isOnline) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudOff,
+                                            contentDescription = "Offline",
+                                            tint = Color(0xFF999999),
+                                            modifier = Modifier
+                                                .width(20.dp)
+                                                .height(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text(
+                                        text = if (isOnline) "Apply" else "Apply (Offline)",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -207,56 +269,35 @@ fun TopSubjectsScreen(
 }
 
 @Composable
-private fun TopSubjectCard(
-    ranking: Int,
-    subject: String,
-    frequency: Int
-) {
+private fun RecommendedSubjectItem(subject: Subject) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 2.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Ranking number
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = PrimaryOrange,
-                        shape = RoundedCornerShape(8.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "#$ranking",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            // Subject information
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subject,
+                    text = subject.name,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = OnSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$frequency sessions",
+                    text = "Code: ${subject.code}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MediumGray
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${subject.count} students interested",
                     style = MaterialTheme.typography.labelSmall,
                     color = PrimaryOrange,
                     fontWeight = FontWeight.SemiBold
