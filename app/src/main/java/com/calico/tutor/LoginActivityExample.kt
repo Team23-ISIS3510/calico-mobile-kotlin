@@ -33,7 +33,7 @@ class LoginActivityExample : AppCompatActivity() {
 
     private lateinit var viewModel: AuthViewModel
     private val googleSignInManager by lazy {
-        val googleClientId = BuildConfig.GOOGLE_CLIENT_ID_ANDROID
+        val googleClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         GoogleSignInManager(this, googleClientId)
     }
 
