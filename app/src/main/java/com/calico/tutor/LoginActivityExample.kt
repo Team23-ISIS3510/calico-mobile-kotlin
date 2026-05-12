@@ -33,8 +33,8 @@ class LoginActivityExample : AppCompatActivity() {
 
     private lateinit var viewModel: AuthViewModel
     private val googleSignInManager by lazy {
-        // TODO: Reemplaza con tu Web Client ID
-        GoogleSignInManager(this, "YOUR_WEB_CLIENT_ID")
+        val googleClientId = BuildConfig.GOOGLE_CLIENT_ID_ANDROID
+        GoogleSignInManager(this, googleClientId)
     }
 
     // Launcher para iniciar Google Sign-In
