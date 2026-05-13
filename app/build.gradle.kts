@@ -18,7 +18,6 @@ val envProperties = Properties().apply {
 
 val googleWebClientId = (
     localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")
-        ?: envProperties.getProperty("GOOGLE_CLIENT_ID_ANDROID")
         ?: envProperties.getProperty("GOOGLE_CLIENT_ID")
     )?.trim().orEmpty()
 
