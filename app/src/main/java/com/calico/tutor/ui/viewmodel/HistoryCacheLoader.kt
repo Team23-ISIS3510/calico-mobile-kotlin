@@ -28,6 +28,8 @@ internal object HistoryCacheLoader {
     private const val KEY_USER_PREFIX = "history_user_"
     private val completedStatuses = setOf("completed", "approved", "done", "finished", "past")
 
+    // Fetches sessions for a tutor from network or cache. Subject-cache warmup is
+    // intentionally delegated to the ViewModel so that caller controls concurrency.
     suspend fun loadTutorHistory(
         context: Context,
         cacheDb: CacheDatabase,
@@ -45,26 +47,8 @@ internal object HistoryCacheLoader {
             gson = gson,
             cacheKey = cacheKey,
             fetcher = {
-                coroutineScope {
-                    val sessionsDeferred = async {
-                        ServiceLocator.subjectsApiService(context).getPreviousTutoringSessionsForTutor(tutorId)
-                    }
-                    val subjectWarmupDeferred = async {
-                        runCatching {
-                            ServiceLocator.subjectsApiService(context).getTutorSessionHistory(tutorId)
-                        }.getOrNull()
-                    }
-
-                    val sessionResponse = sessionsDeferred.await()
-                    subjectWarmupDeferred.await()?.let {
-                        cacheDb.saveCache(
-                            KEY_TUTOR_SUBJECTS + "_$tutorId",
-                            gson.toJson(it)
-                        )
-                    }
-
-                    sessionResponse
-                }
+                ServiceLocator.subjectsApiService(context)
+                    .getPreviousTutoringSessionsForTutor(tutorId)
             }
         )
     }
@@ -166,6 +150,9 @@ internal object HistoryCacheLoader {
             .mapNotNull { it.studentId.takeIf(String::isNotBlank) }
             .distinct()
 
+        // Resolución concurrente de perfiles: una corrutina async por cada estudiante único,
+        // todas corriendo en paralelo en Dispatchers.IO. awaitAll() garantiza que ninguna
+        // sesión se mapee antes de tener todos los perfiles resueltos.
         val resolvedUsers = coroutineScope {
             uniqueStudentIds
                 .map { studentId ->
