@@ -27,6 +27,7 @@ import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.CoursesState
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.screen.DatabaseHelper
 import android.content.Context
 import android.util.Log
@@ -131,19 +132,10 @@ fun CoursesScreen(
                 }
                 is CoursesState.Success -> {
                     if (state.isOffline) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
-                        ) {
-                            Text(
-                                text = "Viewing offline data. Check your connection.",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFFF57C00),
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
+                        OfflineBanner(
+                            message = "Viewing offline data. Check your connection.",
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
                     }
 
                     if (state.approvedCourses.isNotEmpty()) {

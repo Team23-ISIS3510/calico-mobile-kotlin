@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun OfflineBanner(
+    message: String = "You are currently offline. These are the latest cached data available.",
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -38,7 +39,7 @@ fun OfflineBanner(
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = "You are currently offline. These are the latest cached data available.",
+            text = message,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = Color(0xFF5D4037),
