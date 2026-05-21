@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.calico.tutor.data.cache.InMemoryCache
 import com.calico.tutor.data.local.CacheDatabase
+import com.calico.tutor.data.local.FileManager
 import com.calico.tutor.data.local.UserPreferencesDataStore
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
@@ -39,10 +40,12 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
     private val _isOnline = MutableStateFlow(true)
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
-    private val cacheDb = ServiceLocator.cacheDatabase(context)
-    private val userPrefs = ServiceLocator.userPreferences(context)
+    private val cacheDb     = ServiceLocator.cacheDatabase(context)
+    private val userPrefs   = ServiceLocator.userPreferences(context)
     private val memoryCache = ServiceLocator.inMemoryCache()
-    private val gson = Gson()
+    // Estrategia 3 de local storage: FileManager para logs auditables (mismo patrón que Home y Disponibilidad)
+    private val fileManager = ServiceLocator.fileManager(context)
+    private val gson        = Gson()
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var monitoredTutorId: String = ""
@@ -60,12 +63,14 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
             _historyState.value = HistoryState.Loading
 
             // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
+            // Flujo idéntico a Home: L1 (InMemoryCache) → L2 (SQLite fresco) → Red → L2 expirado (fallback)
             val result = withContext(Dispatchers.IO) {
                 HistoryCacheLoader.loadTutorHistory(
                     context = context,
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     tutorId = tutorId
                 )
@@ -97,7 +102,12 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     }
                 }
             }
-            // Las dos hijas terminaron; de vuelta en Main Thread para actualizar la UI
+
+            // Sincronizar timestamp de última carga exitosa con DataStore (mismo patrón que Home)
+            if (result is HistoryState.Success) {
+                userPrefs.updateLastSyncTime()
+            }
+            // De vuelta en Main Thread para actualizar la UI
             _historyState.value = result
         }
     }
@@ -116,12 +126,14 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
             _historyState.value = HistoryState.Loading
 
             // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
+            // Flujo idéntico a Home: L1 (InMemoryCache) → L2 (SQLite fresco) → Red → L2 expirado (fallback)
             val result = withContext(Dispatchers.IO) {
                 HistoryCacheLoader.loadStudentHistory(
                     context = context,
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     studentId = studentId,
                     startDate = startDate,
@@ -153,7 +165,12 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     }
                 }
             }
-            // Las dos hijas terminaron; de vuelta en Main Thread para actualizar la UI
+
+            // Sincronizar timestamp de última carga exitosa con DataStore (mismo patrón que Home)
+            if (result is HistoryState.Success) {
+                userPrefs.updateLastSyncTime()
+            }
+            // De vuelta en Main Thread para actualizar la UI
             _historyState.value = result
         }
     }

@@ -7,6 +7,7 @@ import com.calico.tutor.data.dto.response.TutoringSessionData
 import com.calico.tutor.data.dto.response.TutoringSessionsResponse
 import com.calico.tutor.data.dto.response.UserProfileResponse
 import com.calico.tutor.data.local.CacheDatabase
+import com.calico.tutor.data.local.FileManager
 import com.calico.tutor.data.local.UserPreferencesDataStore
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
@@ -28,13 +29,15 @@ internal object HistoryCacheLoader {
     private const val KEY_USER_PREFIX = "history_user_"
     private val completedStatuses = setOf("completed", "approved", "done", "finished", "past")
 
-    // Fetches sessions for a tutor from network or cache. Subject-cache warmup is
-    // intentionally delegated to the ViewModel so that caller controls concurrency.
+    // Fetches sessions for a tutor through the 2-level cache pipeline (L1→L2→Network).
+    // Subject-cache warmup is intentionally delegated to the ViewModel so that caller
+    // controls concurrency. FileManager logging mirrors the pattern used in HomeScreenViewModel.
     suspend fun loadTutorHistory(
         context: Context,
         cacheDb: CacheDatabase,
         memoryCache: InMemoryCache,
         userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
         gson: Gson,
         tutorId: String
     ): HistoryState = withContext(Dispatchers.IO) {
@@ -44,6 +47,7 @@ internal object HistoryCacheLoader {
             cacheDb = cacheDb,
             memoryCache = memoryCache,
             userPrefs = userPrefs,
+            fileManager = fileManager,
             gson = gson,
             cacheKey = cacheKey,
             fetcher = {
@@ -58,6 +62,7 @@ internal object HistoryCacheLoader {
         cacheDb: CacheDatabase,
         memoryCache: InMemoryCache,
         userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
         gson: Gson,
         studentId: String,
         startDate: String? = null,
@@ -71,6 +76,7 @@ internal object HistoryCacheLoader {
             cacheDb = cacheDb,
             memoryCache = memoryCache,
             userPrefs = userPrefs,
+            fileManager = fileManager,
             gson = gson,
             cacheKey = cacheKey,
             fetcher = {
@@ -85,12 +91,23 @@ internal object HistoryCacheLoader {
         )
     }
 
+    /**
+     * Núcleo del pipeline de caché de 2 niveles para History.
+     *
+     * Flujo idéntico al de HomeScreenViewModel.fetchSessionsWithCache:
+     *   L1 (InMemoryCache) → L2 SQLite fresco → Red → L2 SQLite expirado (offline fallback) → Error
+     *
+     * Dispatchers.IO: todas las operaciones de SQLite y red se ejecutan aquí ya que el
+     * llamador (loadTutorHistory / loadStudentHistory) usa withContext(Dispatchers.IO).
+     * FileManager registra los mismos eventos que Home para auditoría y debugging offline.
+     */
     @Suppress("UNCHECKED_CAST")
     private suspend fun loadHistory(
         context: Context,
         cacheDb: CacheDatabase,
         memoryCache: InMemoryCache,
         userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
         gson: Gson,
         cacheKey: String,
         fetcher: suspend () -> TutoringSessionsResponse
@@ -98,12 +115,14 @@ internal object HistoryCacheLoader {
         val expiryMs = userPrefs.cacheExpiryMs.first()
         val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
 
+        // Nivel 1: caché en memoria (LRU) — acceso O(1), sin I/O de disco
         memoryCache.get(cacheKey)?.let { entry ->
             Log.d(TAG, "History: L1 cache hit for $cacheKey")
             val sessions = entry.value as List<TutoringSessionData>
             return HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
         }
 
+        // Nivel 2: SQLite — persistencia entre sesiones de la app; verificar frescura
         val (cachedJson, cachedTs) = cacheDb.getCache(cacheKey)
         val isFresh = (System.currentTimeMillis() - cachedTs) < expiryMs
 
@@ -114,17 +133,22 @@ internal object HistoryCacheLoader {
             return HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
         }
 
+        // Nivel 3: Red — fetch remoto + sincronización API → SQLite (L2) → InMemoryCache (L1)
         return try {
             val response = fetcher()
             val sessions = response.sessions
-            cacheDb.saveCache(cacheKey, gson.toJson(sessions, sessionType))
-            memoryCache.put(cacheKey, sessions)
+            cacheDb.saveCache(cacheKey, gson.toJson(sessions, sessionType))   // API → SQLite
+            memoryCache.put(cacheKey, sessions)                               // API → InMemoryCache
+            fileManager.appendLog("History cargada de red para $cacheKey")
             HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
         } catch (e: Exception) {
             Log.e(TAG, "History network error for $cacheKey: ${e.message}")
+            fileManager.appendLog("History network error para $cacheKey: ${e.message}")
+            // Fallback offline: usar L2 aunque esté expirado (tolerancia a fallos, mismo patrón que Home)
             cachedJson?.let {
                 val sessions = gson.fromJson<List<TutoringSessionData>>(it, sessionType)
                 memoryCache.put(cacheKey, sessions)
+                fileManager.appendLog("History: usando caché local (offline) para $cacheKey")
                 HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
             } ?: HistoryState.Error("Failed to load tutoring history.")
         }
