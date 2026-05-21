@@ -18,7 +18,7 @@ import com.calico.tutor.ui.theme.PrimaryOrange
 import kotlin.math.roundToInt
 
 /**
- * Componente que muestra una tarjeta con la analítica de un tutor y materia
+ * Component that shows a tutor and subject analytics card.
  */
 @Composable
 fun TutorAnalyticsCard(
@@ -51,7 +51,7 @@ fun TutorAnalyticsCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header: Materia y Tutor
+            // Header: subject and tutor
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -67,7 +67,7 @@ fun TutorAnalyticsCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Código: ${analytics.subjectCode}",
+                        text = "Code: ${analytics.subjectCode}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray,
                         fontSize = 12.sp
@@ -82,7 +82,7 @@ fun TutorAnalyticsCard(
                     )
                 }
                 
-                // Indicador visual
+                // Visual indicator
                 Box(
                     modifier = Modifier
                         .background(
@@ -103,22 +103,22 @@ fun TutorAnalyticsCard(
             Divider(color = Color.LightGray, thickness = 1.dp)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Métricas principales
+            // Main metrics
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 MetricItem(
-                    label = "Sesiones por Hora",
+                    label = "Sessions per Hour",
                     value = String.format("%.2f", analytics.overallSessionsPerHour),
-                    unit = "sesiones/h",
+                    unit = "sessions/h",
                     modifier = Modifier.weight(1f)
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
                 MetricItem(
-                    label = "Ocupación",
+                    label = "Occupancy",
                     value = "${analytics.overallOccupancyRate.roundToInt()}%",
                     unit = "",
                     modifier = Modifier.weight(1f)
@@ -127,9 +127,9 @@ fun TutorAnalyticsCard(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 MetricItem(
-                    label = "Total Sesiones",
+                    label = "Total Sessions",
                     value = "${analytics.totalSessions}",
-                    unit = "sesiones",
+                    unit = "sessions",
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -138,9 +138,9 @@ fun TutorAnalyticsCard(
             Divider(color = Color.LightGray, thickness = 1.dp)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Desglose por demanda
+            // Demand breakdown
             Text(
-                text = "Desglose por Período de Demanda",
+                text = "Demand Period Breakdown",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black,
@@ -154,7 +154,7 @@ fun TutorAnalyticsCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 DemandPeriodItem(
-                    title = "Alta Demanda",
+                    title = "High Demand",
                     sessionsPerHour = analytics.highDemandMetrics.sessionsPerHour,
                     occupancyRate = analytics.highDemandMetrics.occupancyRate,
                     modifier = Modifier.weight(1f)
@@ -163,7 +163,7 @@ fun TutorAnalyticsCard(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 DemandPeriodItem(
-                    title = "Demanda Normal",
+                    title = "Normal Demand",
                     sessionsPerHour = analytics.normalDemandMetrics.sessionsPerHour,
                     occupancyRate = analytics.normalDemandMetrics.occupancyRate,
                     modifier = Modifier.weight(1f)
@@ -172,7 +172,7 @@ fun TutorAnalyticsCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Footer: Estado y ocupación
+            // Footer: status and occupancy
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -184,9 +184,9 @@ fun TutorAnalyticsCard(
             ) {
                 Text(
                     text = when (analytics.occupancyLevel) {
-                        OccupancyLevel.OVERLOADED -> "⚠️ Tutor Sobrecargado: El volumen de sesiones exceede la disponibilidad"
-                        OccupancyLevel.MODERATE -> "⚡ Ocupación Moderada: El tutor tiene capacidad limitada"
-                        OccupancyLevel.AVAILABLE -> "✅ Disponible: El tutor puede recibir más sesiones"
+                        OccupancyLevel.OVERLOADED -> "⚠️ Overloaded tutor: session volume exceeds availability"
+                        OccupancyLevel.MODERATE -> "⚡ Moderate occupancy: the tutor has limited capacity"
+                        OccupancyLevel.AVAILABLE -> "✅ Available: the tutor can take more sessions"
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Black,
@@ -198,7 +198,7 @@ fun TutorAnalyticsCard(
 }
 
 /**
- * Componente para mostrar una métrica individual
+ * Component to display an individual metric.
  */
 @Composable
 private fun MetricItem(
@@ -243,7 +243,7 @@ private fun MetricItem(
 }
 
 /**
- * Componente para mostrar métricas de período de demanda
+ * Component to display demand period metrics.
  */
 @Composable
 private fun DemandPeriodItem(
@@ -270,7 +270,7 @@ private fun DemandPeriodItem(
         Spacer(modifier = Modifier.height(6.dp))
         
         Text(
-            text = "Sesiones/h: ${String.format("%.2f", sessionsPerHour)}",
+            text = "Sessions/h: ${String.format("%.2f", sessionsPerHour)}",
             style = MaterialTheme.typography.labelSmall,
             color = PrimaryOrange,
             fontWeight = FontWeight.SemiBold,
@@ -279,7 +279,7 @@ private fun DemandPeriodItem(
         Spacer(modifier = Modifier.height(2.dp))
         
         Text(
-            text = "Ocupación: ${occupancyRate.roundToInt()}%",
+            text = "Occupancy: ${occupancyRate.roundToInt()}%",
             style = MaterialTheme.typography.labelSmall,
             color = Color.Gray,
             fontSize = 10.sp

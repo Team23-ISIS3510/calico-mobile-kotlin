@@ -38,7 +38,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             GoogleSignInManager(activity, googleWebClientId)
         } catch (e: Exception) {
             Log.e(TAG, "Error inicializando GoogleSignInManager: ${e.message}", e)
-            setErrorToShow("Error inicializando Google Sign-In: ${e.localizedMessage}")
+            setErrorToShow("Error initializing Google Sign-In: ${e.localizedMessage}")
             null
         }
     }
@@ -100,24 +100,24 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             } else {
                 Log.e(TAG, "idToken es null después de Google Sign-In exitoso")
                 setGoogleLoading(false)
-                setErrorToShow("Error: No se obtuvo el ID Token de Google. Verifica la configuración del Web Client ID.")
+                setErrorToShow("Error: Google ID token was not received. Check the Web Client ID configuration.")
             }
         } catch (e: ApiException) {
             setGoogleLoading(false)
             val errorMessage = when (e.statusCode) {
-                10    -> "Error de configuración (código 10): SHA-1 o Client ID incorrecto"
-                12500 -> "Google Play Services está desactualizado"
-                12501 -> "El usuario canceló el inicio de sesión"
-                12502 -> "Google Play Services no disponible en este dispositivo"
-                12503 -> "Clave de API de Google inválida"
-                else  -> "Error Google Sign-In (código ${e.statusCode}): ${e.message}"
+                10    -> "Configuration error (code 10): incorrect SHA-1 or Client ID"
+                12500 -> "Google Play Services is out of date"
+                12501 -> "The user canceled sign-in"
+                12502 -> "Google Play Services is unavailable on this device"
+                12503 -> "Invalid Google API key"
+                else  -> "Google Sign-In error (code ${e.statusCode}): ${e.message}"
             }
             Log.e(TAG, "ApiException en Google Sign-In: código=${e.statusCode}, mensaje=${e.message}")
             setErrorToShow(errorMessage)
         } catch (e: Exception) {
             setGoogleLoading(false)
             Log.e(TAG, "Excepción inesperada en Google Sign-In callback: ${e.message}", e)
-            setErrorToShow("Error inesperado: ${e.localizedMessage}")
+            setErrorToShow("Unexpected error: ${e.localizedMessage}")
         }
     }
 
@@ -151,7 +151,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     onRegisterClick = { setShowLogin(false) },
                     onGoogleLoginClick = {
                         if (googleSignInManager == null) {
-                            setErrorToShow("Google Sign-In no disponible. Reinicia la app.")
+                            setErrorToShow("Google Sign-In is unavailable. Restart the app.")
                         } else {
                             Log.d(TAG, "Lanzando Google Sign-In intent")
                             setGoogleLoading(true)
@@ -160,7 +160,7 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                             } catch (e: Exception) {
                                 setGoogleLoading(false)
                                 Log.e(TAG, "Error lanzando Google Sign-In: ${e.message}", e)
-                                setErrorToShow("Error iniciando Google Sign-In: ${e.localizedMessage}")
+                                setErrorToShow("Error starting Google Sign-In: ${e.localizedMessage}")
                             }
                         }
                     },
