@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.dto.request.BugReportRequest
+import com.calico.tutor.data.dto.request.HistoryViewRequest
 import com.calico.tutor.data.dto.request.HomepageLoadRequest
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.CoroutineScope
@@ -193,6 +194,25 @@ class TelemetryRepository(
                 }
             } catch (e: Exception) {
                 Log.e("TelemetryRepository", "Failed to send homepage load telemetry", e)
+            }
+        }
+    }
+
+    fun reportHistoryViewOpened(tutorId: String) {
+        scope.launch {
+            try {
+                val request = HistoryViewRequest(
+                    tutorId = tutorId,
+                    eventType = "history_view_opened",
+                    timestamp = currentTimestampIso()
+                )
+                Log.d("TelemetryRepository", "Sending HISTORY_VIEW_OPENED event: ${gson.toJson(request)}")
+                val response = apiService.reportHistoryViewOpened(request)
+                if (!response.isSuccessful) {
+                    Log.e("TelemetryRepository", "History view event rejected: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("TelemetryRepository", "Failed to send history view event", e)
             }
         }
     }
