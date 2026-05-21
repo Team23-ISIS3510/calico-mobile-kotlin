@@ -79,8 +79,10 @@ class CoursesViewModel(
 
             // Always try to sync pending applications when coming online
             val pendingAppsFromDb = try {
-                withContext(Dispatchers.IO) {
-                    dbHelper.getPendingApplications()
+                withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.IO) {
+                        dbHelper.getPendingApplications()
+                    }
                 }
             } catch (e: Exception) {
                 Log.w("CoursesViewModel", "Pending apps table error: ${e.message}")
@@ -103,8 +105,10 @@ class CoursesViewModel(
                 var allCoursesResponse: AllCoursesResponse = AllCoursesResponse()
 
                 try {
-                    approvedCourses = withContext(Dispatchers.IO) {
-                        subjectsApiService.getTutorCourses(tutorId)
+                    approvedCourses = withContext(Dispatchers.Main) {
+                        withContext(Dispatchers.IO) {
+                            subjectsApiService.getTutorCourses(tutorId)
+                        }
                     }
                     // Only cache after successful API call
                     approvedCoursesCache.put("approved_$tutorId", approvedCourses)
@@ -116,22 +120,26 @@ class CoursesViewModel(
                     approvedCourses = (cached as? List<TutorCourseData>) ?: emptyList()
                     // If still empty, try DB
                     if (approvedCourses.isEmpty()) {
-                        approvedCourses = withContext(Dispatchers.IO) {
-                            dbHelper.getApprovedCourses().map { course ->
-                                TutorCourseData(
-                                    id = course.id.toString(),
-                                    name = course.title,
-                                    code = course.description ?: "",
-                                    credits = course.category?.toIntOrNull() ?: 0
-                                )
+                        approvedCourses = withContext(Dispatchers.Main) {
+                            withContext(Dispatchers.IO) {
+                                dbHelper.getApprovedCourses().map { course ->
+                                    TutorCourseData(
+                                        id = course.id.toString(),
+                                        name = course.title,
+                                        code = course.description ?: "",
+                                        credits = course.category?.toIntOrNull() ?: 0
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 try {
-                    applications = withContext(Dispatchers.IO) {
-                        subjectsApiService.getTutorApplications(tutorId)
+                    applications = withContext(Dispatchers.Main) {
+                        withContext(Dispatchers.IO) {
+                            subjectsApiService.getTutorApplications(tutorId)
+                        }
                     }
                     applicationsCache.put("apps_$tutorId", applications)
                     Log.d("CoursesViewModel", "✅ API: applications loaded (${applications.size})")
@@ -140,28 +148,32 @@ class CoursesViewModel(
                     val cached = applicationsCache.get("apps_$tutorId")
                     applications = (cached as? List<CourseApplicationResponse>) ?: emptyList()
                     if (applications.isEmpty()) {
-                        applications = withContext(Dispatchers.IO) {
-                            try {
-                                dbHelper.getApplications().map { app ->
-                                    CourseApplicationResponse(
-                                        id = app.id.toString(),
-                                        courseId = app.courseId,
-                                        courseName = app.courseName,
-                                        courseCode = app.courseCode,
-                                        status = app.status,
-                                        rejectionReason = app.rejectionReason
-                                    )
+                        applications = withContext(Dispatchers.Main) {
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    dbHelper.getApplications().map { app ->
+                                        CourseApplicationResponse(
+                                            id = app.id.toString(),
+                                            courseId = app.courseId,
+                                            courseName = app.courseName,
+                                            courseCode = app.courseCode,
+                                            status = app.status,
+                                            rejectionReason = app.rejectionReason
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    emptyList()
                                 }
-                            } catch (e: Exception) {
-                                emptyList()
                             }
                         }
                     }
                 }
 
                 try {
-                    allCoursesResponse = withContext(Dispatchers.IO) {
-                        subjectsApiService.getAllAvailableCourses()
+                    allCoursesResponse = withContext(Dispatchers.Main) {
+                        withContext(Dispatchers.IO) {
+                            subjectsApiService.getAllAvailableCourses()
+                        }
                     }
                     allCoursesCache.put("all", allCoursesResponse)
                     Log.d("CoursesViewModel", "✅ API: all courses loaded (${allCoursesResponse.courses.size})")
@@ -170,19 +182,21 @@ class CoursesViewModel(
                     val cached = allCoursesCache.get("all")
                     allCoursesResponse = cached as? AllCoursesResponse ?: AllCoursesResponse()
                     if (allCoursesResponse.courses.isEmpty()) {
-                        allCoursesResponse = withContext(Dispatchers.IO) {
-                            val localCourses = dbHelper.getCourses()
-                            val courseList = localCourses.map { course ->
-                                AvailableCourseResponse(
-                                    id = course.id.toString(),
-                                    name = course.title,
-                                    code = course.description ?: "",
-                                    credits = 0,
-                                    faculty = course.category,
-                                    hasApplied = false
-                                )
+                        allCoursesResponse = withContext(Dispatchers.Main) {
+                            withContext(Dispatchers.IO) {
+                                val localCourses = dbHelper.getCourses()
+                                val courseList = localCourses.map { course ->
+                                    AvailableCourseResponse(
+                                        id = course.id.toString(),
+                                        name = course.title,
+                                        code = course.description ?: "",
+                                        credits = 0,
+                                        faculty = course.category,
+                                        hasApplied = false
+                                    )
+                                }
+                                AllCoursesResponse(courses = courseList)
                             }
-                            AllCoursesResponse(courses = courseList)
                         }
                     }
                 }
