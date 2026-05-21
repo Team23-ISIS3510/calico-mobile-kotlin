@@ -7,6 +7,5 @@
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">backend-th7q.onrender.com</domain>
-        <domain includeSubdomains="true">localhost</domain>
     </domain-config>
 </network-security-config>
