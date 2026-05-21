@@ -25,9 +25,9 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.calico.tutor.R
-import com.calico.tutor.data.dto.response.CourseData
 import com.calico.tutor.data.dto.response.TutorOccupancyData
 import com.calico.tutor.domain.model.Session
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.HomeScreenViewModelFactory
 import com.calico.tutor.ui.viewmodel.HomeScreenViewModel
@@ -56,6 +56,7 @@ fun HomeScreen(
     val occupancyState by vm.occupancyState.collectAsState()
     val subjectsState  by vm.subjectsState.collectAsState()
     val tutorName      by vm.tutorName.collectAsState()
+    val isOnline       by vm.isOnline.collectAsState()
 
     LaunchedEffect(tutorId) {
         vm.onHomepageOpened()
@@ -112,6 +113,12 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            // Show offline banner when not connected
+            if (!isOnline) {
+                OfflineBanner()
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
             Text(
                 text = "WELCOME TO CALICO,\n$displayName",
@@ -187,37 +194,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ── Vista 4: Recommended Subjects ─────────────────────────────────
-            Text(
-                text = "Recommended Subjects",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            when (val state = subjectsState) {
-                is SubjectsState.Loading -> LoadingBox(height = 60.dp)
-                is SubjectsState.Error   -> ErrorText(state.message)
-                is SubjectsState.Success -> {
-                    if (state.subjects.isEmpty()) {
-                        Text(
-                            text = "No recommended subjects available.",
-                            color = MediumGray,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        state.subjects.take(5).forEach { subj ->
-                            SubjectChip(name = subj.course ?: subj.courseId)
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-                    }
-                }
-                else -> {}
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
             Button(
                 onClick = onNavigateToTopSubjects,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -227,7 +203,7 @@ fun HomeScreen(
                     contentColor   = Color.White
                 )
             ) {
-                Text("See all recommended subjects", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Recommended Subjects", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(32.dp))

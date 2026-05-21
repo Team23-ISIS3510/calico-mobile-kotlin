@@ -24,6 +24,7 @@ class CacheDatabase(context: Context) : SQLiteOpenHelper(
         private const val DATABASE_VERSION = 2
 
         const val KEY_SESSIONS       = "sessions"
+        const val KEY_HISTORY        = "history"
         const val KEY_OCCUPANCY      = "occupancy"
         const val KEY_SUBJECTS       = "subjects_recommended"
         const val KEY_AVAILABILITIES = "availabilities"

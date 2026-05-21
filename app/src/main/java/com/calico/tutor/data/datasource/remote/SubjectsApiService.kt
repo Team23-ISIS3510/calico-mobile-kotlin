@@ -10,6 +10,7 @@ import com.calico.tutor.data.dto.response.TutorCourseData
 import com.calico.tutor.data.dto.response.CourseApplicationResponse
 import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.data.dto.response.AllCoursesResponse
+import com.calico.tutor.data.dto.response.UserProfileResponse
 import com.calico.tutor.domain.model.SessionHistory
 import com.calico.tutor.data.dto.AvailabilityResponseDto
 import retrofit2.http.GET
@@ -22,6 +23,23 @@ interface SubjectsApiService {
     @GET("subjects/history")
     
     suspend fun getSubjectsHistory(): SubjectsHistoryResponse
+
+    @GET("tutoring-sessions/tutor/{tutorId}/previous")
+    suspend fun getPreviousTutoringSessionsForTutor(
+        @Path("tutorId") tutorId: String
+    ): TutoringSessionsResponse
+
+    @GET("tutoring-sessions/student/{studentId}/history")
+    suspend fun getStudentTutoringSessionsHistory(
+        @Path("studentId") studentId: String,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
+        @Query("course") course: String? = null,
+        @Query("limit") limit: Int? = null
+    ): TutoringSessionsResponse
+
+    @GET("users/{id}")
+    suspend fun getUserById(@Path("id") id: String): UserProfileResponse
 
     @GET("subjects/history/tutor/{tutorId}")
     suspend fun getTutorSessionHistory(@Path("tutorId") tutorId: String): SessionHistory
