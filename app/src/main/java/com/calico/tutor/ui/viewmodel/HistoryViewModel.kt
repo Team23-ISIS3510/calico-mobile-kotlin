@@ -17,7 +17,6 @@ import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,57 +57,83 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
     fun loadTutorHistory(tutorId: String) {
         monitoredTutorId = tutorId
 
-        // Corrutina padre: ligada al ciclo de vida del ViewModel, ejecuta en Main Thread
+        // Corrutina padre: administrada por viewModelScope (Main Thread)
+        // Se cancela automáticamente si el usuario sale de la pantalla → sin memory leaks
         viewModelScope.launch {
             _historyState.value = HistoryState.Loading
 
-            // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
-            // Flujo idéntico a Home: L1 (InMemoryCache) → L2 (SQLite fresco) → Red → L2 expirado (fallback)
-            val result = withContext(Dispatchers.IO) {
-                HistoryCacheLoader.loadTutorHistory(
+            // ── PASO 1: cache hit ────────────────────────────────────────────────────
+            // Lee L1 (InMemoryCache) → L2 (SQLite) sin tocar la red.
+            // Dispatchers.IO: lectura de SQLite bloquea; nunca correr en Main Thread.
+            val cachedResult = withContext(Dispatchers.IO) {
+                HistoryCacheLoader.readCachedTutorHistory(
                     context = context,
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
-                    fileManager = fileManager,
                     gson = gson,
                     tutorId = tutorId
                 )
             }
 
-            // Structured concurrency: corrutinas hijas en paralelo dentro de la corrutina padre
-            coroutineScope {
-                // Corrutina hija 1: persistir timestamp de último acceso en BD local (Dispatchers.IO)
-                launch(Dispatchers.IO) {
-                    cacheDb.saveCache(
-                        "history_last_access_$tutorId",
-                        System.currentTimeMillis().toString()
-                    )
-                    Log.d(TAG, "[$tutorId] Timestamp de último acceso persistido en SQLite")
-                }
+            // Mostrar datos locales inmediatamente si existen (UX: sin esperar la red)
+            // Si no hay caché, la UI permanece en Loading hasta que la red responda
+            if (cachedResult != null) {
+                _historyState.value = cachedResult
+            }
 
-                // Corrutina hija 2: pre-calentar caché de materias del tutor en segundo plano (Dispatchers.IO)
-                launch(Dispatchers.IO) {
-                    runCatching {
-                        val subjectHistory = ServiceLocator.subjectsApiService(context)
-                            .getTutorSessionHistory(tutorId)
-                        cacheDb.saveCache(
-                            "history_subjects_$tutorId",
-                            gson.toJson(subjectHistory)
-                        )
-                        Log.d(TAG, "[$tutorId] Caché de materias pre-calentado correctamente")
-                    }.onFailure { e ->
-                        Log.w(TAG, "[$tutorId] Warmup de materias falló (no crítico): ${e.message}")
+            // ── PASO 2: corrutina hija 1 — refresh de red en background ─────────────
+            // Patrón stale-while-revalidate: la UI ya muestra el caché, la red actualiza en paralelo.
+            // No usamos coroutineScope{} → el padre NO espera a esta hija para continuar.
+            // Dispatchers.IO: llamada Retrofit bloquea; SQLite también.
+            launch(Dispatchers.IO) {
+                runCatching {
+                    HistoryCacheLoader.fetchAndCacheTutorHistory(
+                        context = context,
+                        cacheDb = cacheDb,
+                        memoryCache = memoryCache,
+                        fileManager = fileManager,
+                        gson = gson,
+                        userPrefs = userPrefs,
+                        tutorId = tutorId
+                    )
+                }.onSuccess { freshResult ->
+                    // Volver a Main Thread para actualizar la UI con datos frescos de la red
+                    withContext(Dispatchers.Main) {
+                        _historyState.value = freshResult
+                        userPrefs.updateLastSyncTime()
+                    }
+                }.onFailure { e ->
+                    // Red falló: si ya había caché visible, el usuario no nota nada
+                    // Solo mostrar error si el cache miss fue total (sin datos locales)
+                    fileManager.appendLog("History background refresh falló para $tutorId: ${e.message}")
+                    Log.w(TAG, "[$tutorId] Refresh de red falló — manteniendo caché visible")
+                    if (cachedResult == null) {
+                        withContext(Dispatchers.Main) {
+                            _historyState.value = HistoryState.Error("Failed to load history.")
+                        }
                     }
                 }
             }
 
-            // Sincronizar timestamp de última carga exitosa con DataStore (mismo patrón que Home)
-            if (result is HistoryState.Success) {
-                userPrefs.updateLastSyncTime()
+            // ── PASO 3: corrutina hija 2 — timestamp de acceso en SQLite ────────────
+            // Fire-and-forget: registrar cuándo se visitó el historial por última vez.
+            launch(Dispatchers.IO) {
+                cacheDb.saveCache(
+                    "history_last_access_$tutorId",
+                    System.currentTimeMillis().toString()
+                )
             }
-            // De vuelta en Main Thread para actualizar la UI
-            _historyState.value = result
+
+            // ── PASO 4: corrutina hija 3 — pre-calentar caché de materias ────────────
+            // Calienta caché secundaria en background sin impactar la UI principal.
+            launch(Dispatchers.IO) {
+                runCatching {
+                    val subjectHistory = ServiceLocator.subjectsApiService(context)
+                        .getTutorSessionHistory(tutorId)
+                    cacheDb.saveCache("history_subjects_$tutorId", gson.toJson(subjectHistory))
+                }.onFailure { Log.w(TAG, "[$tutorId] Subject warmup falló (no crítico)") }
+            }
         }
     }
 
@@ -121,19 +146,18 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
     ) {
         monitoredStudentId = studentId
 
-        // Corrutina padre: ligada al ciclo de vida del ViewModel, ejecuta en Main Thread
+        // Corrutina padre: administrada por viewModelScope (Main Thread)
         viewModelScope.launch {
             _historyState.value = HistoryState.Loading
 
-            // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
-            // Flujo idéntico a Home: L1 (InMemoryCache) → L2 (SQLite fresco) → Red → L2 expirado (fallback)
-            val result = withContext(Dispatchers.IO) {
-                HistoryCacheLoader.loadStudentHistory(
+            // ── PASO 1: cache hit ────────────────────────────────────────────────────
+            // Lee L1 (InMemoryCache) → L2 (SQLite) sin tocar la red.
+            val cachedResult = withContext(Dispatchers.IO) {
+                HistoryCacheLoader.readCachedStudentHistory(
                     context = context,
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
-                    fileManager = fileManager,
                     gson = gson,
                     studentId = studentId,
                     startDate = startDate,
@@ -143,35 +167,58 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                 )
             }
 
-            // Structured concurrency: corrutinas hijas en paralelo dentro de la corrutina padre
-            coroutineScope {
-                // Corrutina hija 1: persistir timestamp de último acceso en BD local (Dispatchers.IO)
-                launch(Dispatchers.IO) {
-                    cacheDb.saveCache(
-                        "history_last_access_student_$studentId",
-                        System.currentTimeMillis().toString()
-                    )
-                    Log.d(TAG, "[$studentId] Timestamp de último acceso persistido en SQLite")
-                }
+            if (cachedResult != null) {
+                _historyState.value = cachedResult
+            }
 
-                // Corrutina hija 2: persistir contador de sesiones para métricas locales (Dispatchers.IO)
-                launch(Dispatchers.IO) {
-                    if (result is HistoryState.Success) {
-                        cacheDb.saveCache(
-                            "history_session_count_$studentId",
-                            result.sessions.size.toString()
-                        )
-                        Log.d(TAG, "[$studentId] Contador de sesiones cacheado: ${result.sessions.size}")
+            // ── PASO 2: corrutina hija 1 — refresh de red en background ─────────────
+            launch(Dispatchers.IO) {
+                runCatching {
+                    HistoryCacheLoader.fetchAndCacheStudentHistory(
+                        context = context,
+                        cacheDb = cacheDb,
+                        memoryCache = memoryCache,
+                        fileManager = fileManager,
+                        gson = gson,
+                        userPrefs = userPrefs,
+                        studentId = studentId,
+                        startDate = startDate,
+                        endDate = endDate,
+                        course = course,
+                        limit = limit
+                    )
+                }.onSuccess { freshResult ->
+                    withContext(Dispatchers.Main) {
+                        _historyState.value = freshResult
+                        userPrefs.updateLastSyncTime()
+                    }
+                }.onFailure { e ->
+                    fileManager.appendLog("History background refresh falló para student $studentId: ${e.message}")
+                    if (cachedResult == null) {
+                        withContext(Dispatchers.Main) {
+                            _historyState.value = HistoryState.Error("Failed to load history.")
+                        }
                     }
                 }
             }
 
-            // Sincronizar timestamp de última carga exitosa con DataStore (mismo patrón que Home)
-            if (result is HistoryState.Success) {
-                userPrefs.updateLastSyncTime()
+            // ── PASO 3: corrutina hija 2 — timestamp de acceso en SQLite ────────────
+            launch(Dispatchers.IO) {
+                cacheDb.saveCache(
+                    "history_last_access_student_$studentId",
+                    System.currentTimeMillis().toString()
+                )
             }
-            // De vuelta en Main Thread para actualizar la UI
-            _historyState.value = result
+
+            // ── PASO 4: corrutina hija 3 — persistir contador de sesiones ────────────
+            launch(Dispatchers.IO) {
+                if (cachedResult is HistoryState.Success) {
+                    cacheDb.saveCache(
+                        "history_session_count_$studentId",
+                        cachedResult.sessions.size.toString()
+                    )
+                }
+            }
         }
     }
 
