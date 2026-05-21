@@ -107,7 +107,6 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
             if (result is HistoryState.Success) {
                 userPrefs.updateLastSyncTime()
             }
-            // De vuelta en Main Thread para actualizar la UI
             _historyState.value = result
         }
     }
@@ -170,7 +169,6 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
             if (result is HistoryState.Success) {
                 userPrefs.updateLastSyncTime()
             }
-            // De vuelta en Main Thread para actualizar la UI
             _historyState.value = result
         }
     }
