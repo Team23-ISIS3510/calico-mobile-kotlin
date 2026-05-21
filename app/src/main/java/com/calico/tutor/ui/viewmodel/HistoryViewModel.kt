@@ -16,10 +16,12 @@ import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG = "HistoryViewModel"
 
@@ -52,16 +54,51 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
 
     fun loadTutorHistory(tutorId: String) {
         monitoredTutorId = tutorId
-        viewModelScope.launch(Dispatchers.Main) {
+
+        // Corrutina padre: ligada al ciclo de vida del ViewModel, ejecuta en Main Thread
+        viewModelScope.launch {
             _historyState.value = HistoryState.Loading
-            _historyState.value = HistoryCacheLoader.loadTutorHistory(
-                context = context,
-                cacheDb = cacheDb,
-                memoryCache = memoryCache,
-                userPrefs = userPrefs,
-                gson = gson,
-                tutorId = tutorId
-            )
+
+            // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
+            val result = withContext(Dispatchers.IO) {
+                HistoryCacheLoader.loadTutorHistory(
+                    context = context,
+                    cacheDb = cacheDb,
+                    memoryCache = memoryCache,
+                    userPrefs = userPrefs,
+                    gson = gson,
+                    tutorId = tutorId
+                )
+            }
+
+            // Structured concurrency: corrutinas hijas en paralelo dentro de la corrutina padre
+            coroutineScope {
+                // Corrutina hija 1: persistir timestamp de último acceso en BD local (Dispatchers.IO)
+                launch(Dispatchers.IO) {
+                    cacheDb.saveCache(
+                        "history_last_access_$tutorId",
+                        System.currentTimeMillis().toString()
+                    )
+                    Log.d(TAG, "[$tutorId] Timestamp de último acceso persistido en SQLite")
+                }
+
+                // Corrutina hija 2: pre-calentar caché de materias del tutor en segundo plano (Dispatchers.IO)
+                launch(Dispatchers.IO) {
+                    runCatching {
+                        val subjectHistory = ServiceLocator.subjectsApiService(context)
+                            .getTutorSessionHistory(tutorId)
+                        cacheDb.saveCache(
+                            "history_subjects_$tutorId",
+                            gson.toJson(subjectHistory)
+                        )
+                        Log.d(TAG, "[$tutorId] Caché de materias pre-calentado correctamente")
+                    }.onFailure { e ->
+                        Log.w(TAG, "[$tutorId] Warmup de materias falló (no crítico): ${e.message}")
+                    }
+                }
+            }
+            // Las dos hijas terminaron; de vuelta en Main Thread para actualizar la UI
+            _historyState.value = result
         }
     }
 
@@ -73,20 +110,51 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
         limit: Int? = null
     ) {
         monitoredStudentId = studentId
-        viewModelScope.launch(Dispatchers.Main) {
+
+        // Corrutina padre: ligada al ciclo de vida del ViewModel, ejecuta en Main Thread
+        viewModelScope.launch {
             _historyState.value = HistoryState.Loading
-            _historyState.value = HistoryCacheLoader.loadStudentHistory(
-                context = context,
-                cacheDb = cacheDb,
-                memoryCache = memoryCache,
-                userPrefs = userPrefs,
-                gson = gson,
-                studentId = studentId,
-                startDate = startDate,
-                endDate = endDate,
-                course = course,
-                limit = limit
-            )
+
+            // Cambio a Dispatchers.IO para operación pesada: red + SQLite + resolución de perfiles
+            val result = withContext(Dispatchers.IO) {
+                HistoryCacheLoader.loadStudentHistory(
+                    context = context,
+                    cacheDb = cacheDb,
+                    memoryCache = memoryCache,
+                    userPrefs = userPrefs,
+                    gson = gson,
+                    studentId = studentId,
+                    startDate = startDate,
+                    endDate = endDate,
+                    course = course,
+                    limit = limit
+                )
+            }
+
+            // Structured concurrency: corrutinas hijas en paralelo dentro de la corrutina padre
+            coroutineScope {
+                // Corrutina hija 1: persistir timestamp de último acceso en BD local (Dispatchers.IO)
+                launch(Dispatchers.IO) {
+                    cacheDb.saveCache(
+                        "history_last_access_student_$studentId",
+                        System.currentTimeMillis().toString()
+                    )
+                    Log.d(TAG, "[$studentId] Timestamp de último acceso persistido en SQLite")
+                }
+
+                // Corrutina hija 2: persistir contador de sesiones para métricas locales (Dispatchers.IO)
+                launch(Dispatchers.IO) {
+                    if (result is HistoryState.Success) {
+                        cacheDb.saveCache(
+                            "history_session_count_$studentId",
+                            result.sessions.size.toString()
+                        )
+                        Log.d(TAG, "[$studentId] Contador de sesiones cacheado: ${result.sessions.size}")
+                    }
+                }
+            }
+            // Las dos hijas terminaron; de vuelta en Main Thread para actualizar la UI
+            _historyState.value = result
         }
     }
 
