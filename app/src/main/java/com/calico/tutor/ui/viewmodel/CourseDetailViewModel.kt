@@ -110,6 +110,9 @@ class CourseDetailViewModel(
                         noteState = noteState.copy(isPendingSync = noteState.isPendingSync || hasPendingNote(courseId)),
                         isOffline = !_isOnline.value
                     )
+                    if (_isOnline.value) {
+                        syncPendingNotes()
+                    }
                 }
                 is Result.Error -> {
                     _uiState.value = CourseDetailState.Error(
@@ -235,7 +238,6 @@ class CourseDetailViewModel(
             override fun onAvailable(network: Network) {
                 _isOnline.value = true
                 viewModelScope.launch {
-                    syncPendingNotes()
                     if (currentCourseId.isNotBlank() && currentTutorId.isNotBlank()) {
                         load(currentCourseId, currentTutorId)
                     }
@@ -354,7 +356,9 @@ class CourseDetailViewModel(
     }
 
     private suspend fun loadCourseNote(courseId: String, tutorId: String): CourseNoteUiState {
-        val local = withContext(Dispatchers.IO) { dbHelper.getCourseNote(courseId) }
+        val local = runCatching {
+            withContext(Dispatchers.IO) { dbHelper.getCourseNote(courseId) }
+        }.getOrNull()
         val pending = hasPendingNote(courseId)
         val remote = when (val result = repository.getTutorCourses(tutorId)) {
             is Result.Success -> result.data.firstOrNull { it.id == courseId }?.note.orEmpty()
@@ -377,7 +381,8 @@ class CourseDetailViewModel(
     }
 
     private suspend fun hasPendingNote(courseId: String): Boolean = withContext(Dispatchers.IO) {
-        dbHelper.getPendingCourseNotes().any { it.courseId == courseId }
+        runCatching { dbHelper.getPendingCourseNotes().any { it.courseId == courseId } }
+            .getOrDefault(false)
     }
 
     private fun getCurrentNoteState(): CourseNoteUiState {
@@ -402,12 +407,12 @@ class CourseDetailViewModel(
     }
 
     private suspend fun dbHelperEnqueuePendingNote(courseId: String, note: String?, updatedAt: Long) {
-        dbHelper.deletePendingCourseNotesForCourse(courseId)
-        dbHelper.enqueuePendingCourseNote(courseId, note, updatedAt)
+        runCatching { dbHelper.deletePendingCourseNotesForCourse(courseId) }
+        runCatching { dbHelper.enqueuePendingCourseNote(courseId, note, updatedAt) }
     }
 
     private suspend fun dbHelperDeletePendingNote(courseId: String) {
-        dbHelper.deletePendingCourseNotesForCourse(courseId)
+        runCatching { dbHelper.deletePendingCourseNotesForCourse(courseId) }
     }
 
     private suspend fun refreshUiAfterLocalChange(courseId: String, tutorId: String) {

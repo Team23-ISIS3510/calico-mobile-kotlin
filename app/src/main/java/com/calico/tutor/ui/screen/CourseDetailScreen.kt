@@ -87,12 +87,6 @@ fun CourseDetailScreen(
         }
     }
 
-    LaunchedEffect(uiState, isOnline) {
-        if (isOnline && uiState is CourseDetailState.Success) {
-            vm.syncPendingNotes()
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
