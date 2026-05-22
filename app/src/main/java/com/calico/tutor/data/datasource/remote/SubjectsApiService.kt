@@ -13,11 +13,14 @@ import com.calico.tutor.data.dto.response.AllCoursesResponse
 import com.calico.tutor.data.dto.response.UserProfileResponse
 import com.calico.tutor.domain.model.SessionHistory
 import com.calico.tutor.data.dto.AvailabilityResponseDto
+import com.calico.tutor.data.dto.request.UpdateTutorCourseNoteDto
+import com.calico.tutor.data.dto.response.TutorCourseNoteResponseDto
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Body
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.PUT
 
 interface SubjectsApiService {
     @GET("subjects/history")
@@ -64,6 +67,13 @@ interface SubjectsApiService {
 
     @GET("tutors/{tutorId}/courses")
     suspend fun getTutorCourses(@Path("tutorId") tutorId: String): List<TutorCourseData>
+
+    @PUT("tutors/{tutorId}/courses/{courseId}/note")
+    suspend fun updateTutorCourseNote(
+        @Path("tutorId") tutorId: String,
+        @Path("courseId") courseId: String,
+        @Body request: UpdateTutorCourseNoteDto
+    ): TutorCourseNoteResponseDto
 
     @GET("tutors/{tutorId}/applications")
     suspend fun getTutorApplications(@Path("tutorId") tutorId: String): List<CourseApplicationResponse>
