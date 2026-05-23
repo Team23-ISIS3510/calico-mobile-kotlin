@@ -71,6 +71,7 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     tutorId = tutorId
                 )
@@ -158,6 +159,7 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     studentId = studentId,
                     startDate = startDate,
