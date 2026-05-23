@@ -33,10 +33,6 @@ internal object HistoryCacheLoader {
     // Devuelve null si no existe ningún dato local (cache miss total).
     // Dispatchers.IO: SQLite no puede ejecutarse en Main Thread.
     // ─────────────────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-
-=======
->>>>>>> 42aaf7325d55be5c8100809aa7f873f3cbab201f
     @Suppress("UNCHECKED_CAST")
     suspend fun readCachedTutorHistory(
         context: Context,
@@ -153,7 +149,7 @@ internal object HistoryCacheLoader {
         endDate: String? = null,
         course: String? = null,
         limit: Int? = null
-    ): HistoryState? = withContext(Dispatchers.IO) {
+    ): HistoryState = withContext(Dispatchers.IO) {
         val cacheKey = buildStudentCacheKey(studentId, startDate, endDate, course, limit)
         val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
 
