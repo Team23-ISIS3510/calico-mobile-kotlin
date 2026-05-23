@@ -39,13 +39,13 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
     private val _isOnline = MutableStateFlow(true)
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
-    private val cacheDb          = ServiceLocator.cacheDatabase(context)
-    private val userPrefs        = ServiceLocator.userPreferences(context)
-    private val memoryCache      = ServiceLocator.inMemoryCache()
+    private val cacheDb = ServiceLocator.cacheDatabase(context)
+    private val userPrefs = ServiceLocator.userPreferences(context)
+    private val memoryCache = ServiceLocator.inMemoryCache()
     // Estrategia 3 de local storage: FileManager para logs auditables (mismo patrón que Home y Disponibilidad)
-    private val fileManager      = ServiceLocator.fileManager(context)
-    private val telemetryRepo    = ServiceLocator.telemetryRepository(context)
-    private val gson             = Gson()
+    private val fileManager = ServiceLocator.fileManager(context)
+    private val telemetryRepo = ServiceLocator.telemetryRepository(context)
+    private val gson = Gson()
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var monitoredTutorId: String = ""
@@ -76,6 +76,7 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     tutorId = tutorId
                 )
@@ -163,6 +164,7 @@ class HistoryViewModel(private val context: Context) : ViewModel() {
                     cacheDb = cacheDb,
                     memoryCache = memoryCache,
                     userPrefs = userPrefs,
+                    fileManager = fileManager,
                     gson = gson,
                     studentId = studentId,
                     startDate = startDate,

@@ -25,5 +25,7 @@ data class TutorCourseData(
     @SerializedName("enrollmentCount")
     val enrollmentCount: Int = 0,
     @SerializedName("maxCapacity")
-    val maxCapacity: Int = 0
+    val maxCapacity: Int = 0,
+    @SerializedName("note")
+    val note: String? = null
 )
