@@ -10,18 +10,39 @@ import com.calico.tutor.data.dto.response.TutorCourseData
 import com.calico.tutor.data.dto.response.CourseApplicationResponse
 import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.data.dto.response.AllCoursesResponse
+import com.calico.tutor.data.dto.response.UserProfileResponse
 import com.calico.tutor.domain.model.SessionHistory
 import com.calico.tutor.data.dto.AvailabilityResponseDto
+import com.calico.tutor.data.dto.request.UpdateTutorCourseNoteDto
+import com.calico.tutor.data.dto.response.TutorCourseNoteResponseDto
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Body
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.PUT
 
 interface SubjectsApiService {
     @GET("subjects/history")
     
     suspend fun getSubjectsHistory(): SubjectsHistoryResponse
+
+    @GET("tutoring-sessions/tutor/{tutorId}/previous")
+    suspend fun getPreviousTutoringSessionsForTutor(
+        @Path("tutorId") tutorId: String
+    ): TutoringSessionsResponse
+
+    @GET("tutoring-sessions/student/{studentId}/history")
+    suspend fun getStudentTutoringSessionsHistory(
+        @Path("studentId") studentId: String,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
+        @Query("course") course: String? = null,
+        @Query("limit") limit: Int? = null
+    ): TutoringSessionsResponse
+
+    @GET("users/{id}")
+    suspend fun getUserById(@Path("id") id: String): UserProfileResponse
 
     @GET("subjects/history/tutor/{tutorId}")
     suspend fun getTutorSessionHistory(@Path("tutorId") tutorId: String): SessionHistory
@@ -46,6 +67,13 @@ interface SubjectsApiService {
 
     @GET("tutors/{tutorId}/courses")
     suspend fun getTutorCourses(@Path("tutorId") tutorId: String): List<TutorCourseData>
+
+    @PUT("tutors/{tutorId}/courses/{courseId}/note")
+    suspend fun updateTutorCourseNote(
+        @Path("tutorId") tutorId: String,
+        @Path("courseId") courseId: String,
+        @Body request: UpdateTutorCourseNoteDto
+    ): TutorCourseNoteResponseDto
 
     @GET("tutors/{tutorId}/applications")
     suspend fun getTutorApplications(@Path("tutorId") tutorId: String): List<CourseApplicationResponse>

@@ -80,7 +80,7 @@ sealed class SessionAlertState {
  * 4. Si L2 expirado/vacío → traer de red
  * 5. Éxito en red → guardar en L1 y L2
  * 6. Fallo de red + L2 con datos → usar como fallback (aunque expirado)
- * 7. Sin red y sin caché → SessionsState.Error("No hay datos disponibles")
+ * 7. No network and no cache → SessionsState.Error("No data available")
  *
  * EVENTUAL CONNECTIVITY (20 pts) - vistas protegidas:
  * - Upcoming sessions, Previous sessions, Rate of occupancy, Subjects recommended
@@ -101,6 +101,9 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
 
     private val _sessionAlertState = MutableStateFlow<SessionAlertState>(SessionAlertState.Idle)
     val sessionAlertState: StateFlow<SessionAlertState> = _sessionAlertState.asStateFlow()
+
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     private val cacheDb      = ServiceLocator.cacheDatabase(context)
     private val userPrefs    = ServiceLocator.userPreferences(context)
@@ -194,12 +197,15 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
     fun startConnectivityMonitoring(tutorId: String) {
         if (networkCallback != null) return   // already registered
         monitoredTutorId = tutorId
+        checkCurrentConnectivity()
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val req = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                Log.d(TAG, "Network available")
+                _isOnline.value = true
                 val needsLoad = _sessionsState.value is SessionsState.Error ||
                     _sessionsState.value is SessionsState.Idle ||
                     _occupancyState.value is OccupancyState.Error ||
@@ -211,9 +217,23 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
                     }
                 }
             }
+
+            override fun onLost(network: Network) {
+                Log.d(TAG, "Network lost")
+                _isOnline.value = false
+            }
         }
         cm.registerNetworkCallback(req, networkCallback!!)
         Log.d(TAG, "Connectivity monitoring started for $tutorId")
+    }
+
+    private fun checkCurrentConnectivity() {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork
+        val capabilities = cm.getNetworkCapabilities(network)
+        val hasInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        _isOnline.value = hasInternet
+        Log.d(TAG, "Current connectivity status: $hasInternet")
     }
 
     override fun onCleared() {
@@ -284,7 +304,7 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
                 memoryCache.put(cacheKey, rawList)
                 buildSessionsState(rawList)
             } else {
-                SessionsState.Error("No hay datos disponibles")
+                SessionsState.Error("No data available")
             }
         }
     }
@@ -327,53 +347,22 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
                 memoryCache.put(cacheKey, data)
                 OccupancyState.Success(data)
             } else {
-                OccupancyState.Error("No hay datos disponibles")
+                OccupancyState.Error("No data available")
             }
         }
     }
 
     /**
-     * Vista 4: Subjects recommended con caché de 2 niveles.
+     * Vista 4: Recommended subjects with a 2-level cache.
      */
-    @Suppress("UNCHECKED_CAST")
     private suspend fun fetchSubjectsWithCache(): SubjectsState {
-        val cacheKey = CacheDatabase.KEY_SUBJECTS
-        val expiryMs = userPrefs.cacheExpiryMs.first()
-
-        memoryCache.get(cacheKey)?.let { entry ->
-            Log.d(TAG, "Subjects: L1 cache hit")
-            return SubjectsState.Success(entry.value as List<CourseData>)
-        }
-
-        val (cachedJson, cachedTs) = cacheDb.getCache(cacheKey)
-        val isFresh = cachedJson != null && (System.currentTimeMillis() - cachedTs) < expiryMs
-
-        if (isFresh && cachedJson != null) {
-            Log.d(TAG, "Subjects: L2 cache hit (fresh)")
-            val type     = object : TypeToken<List<CourseData>>() {}.type
-            val subjects = gson.fromJson<List<CourseData>>(cachedJson, type)
-            memoryCache.put(cacheKey, subjects)
-            return SubjectsState.Success(subjects)
-        }
-
-        return try {
-            val response = ServiceLocator.subjectsApiService(context).getSubjectsHistory()
-            val subjects = response.data ?: emptyList()
-            val type     = object : TypeToken<List<CourseData>>() {}.type
-            cacheDb.saveCache(cacheKey, gson.toJson(subjects, type))
-            memoryCache.put(cacheKey, subjects)
-            SubjectsState.Success(subjects)
-        } catch (e: Exception) {
-            Log.e(TAG, "Subjects network error: ${e.message}")
-            if (cachedJson != null) {
-                val type     = object : TypeToken<List<CourseData>>() {}.type
-                val subjects = gson.fromJson<List<CourseData>>(cachedJson, type)
-                memoryCache.put(cacheKey, subjects)
-                SubjectsState.Success(subjects)
-            } else {
-                SubjectsState.Error("No hay datos disponibles")
-            }
-        }
+        return SubjectsCacheLoader.loadSubjects(
+            context = context,
+            cacheDb = cacheDb,
+            memoryCache = memoryCache,
+            userPrefs = userPrefs,
+            gson = gson
+        )
     }
 
     // ─────────────────────────────────────────────────────────────────────────

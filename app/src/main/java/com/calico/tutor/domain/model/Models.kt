@@ -27,6 +27,7 @@ data class SubjectsHistory(
 
 data class Session(
     val id: String = "",
+    val studentId: String = "",
     val scheduledStart: String = "",
     val scheduledEnd: String = "",
     val status: String = "",
@@ -36,7 +37,10 @@ data class Session(
     val time: String = "",
     val tutorName: String = "",
     val subjectName: String = "",
-    val subjectCode: String = ""
+    val subjectCode: String = "",
+    val studentName: String = "",
+    val studentAvatarUrl: String = "",
+    val price: String = ""
 )
 
 data class SessionHistory(

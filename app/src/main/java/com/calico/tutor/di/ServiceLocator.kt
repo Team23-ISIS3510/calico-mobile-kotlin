@@ -7,6 +7,7 @@ import com.calico.tutor.data.datasource.remote.AnalyticsApiService
 import com.calico.tutor.data.datasource.remote.AuthApiService
 import com.calico.tutor.data.datasource.remote.SubjectsApiService
 import com.calico.tutor.data.datasource.remote.AvailabilityApiService
+import com.calico.tutor.data.datasource.remote.UsersApiService
 import com.calico.tutor.data.datasource.remote.RetrofitClient
 import com.calico.tutor.data.datasource.remote.TelemetryApiService
 import com.calico.tutor.data.local.CacheDatabase
@@ -16,9 +17,11 @@ import com.calico.tutor.data.repository.TelemetryRepository
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
 import com.calico.tutor.data.repository.AvailabilityRepositoryImpl
+import com.calico.tutor.data.repository.CourseDetailRepositoryImpl
 import com.calico.tutor.domain.repository.AuthRepository
 import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.repository.AvailabilityRepository
+import com.calico.tutor.domain.repository.CourseDetailRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
@@ -68,6 +71,8 @@ object ServiceLocator {
     @Volatile
     private var subjectsApiService: SubjectsApiService? = null
     @Volatile
+    private var usersApiService: UsersApiService? = null
+    @Volatile
     private var availabilityApiService: AvailabilityApiService? = null
     @Volatile
     private var _analyticsApiService: AnalyticsApiService? = null
@@ -79,6 +84,8 @@ object ServiceLocator {
     private var analyticsRepository: AnalyticsRepository? = null
     @Volatile
     private var availabilityRepository: AvailabilityRepository? = null
+    @Volatile
+    private var courseDetailRepository: CourseDetailRepository? = null
     @Volatile
     private var _telemetryRepository: TelemetryRepository? = null
 
@@ -117,6 +124,16 @@ object ServiceLocator {
         }
     }
 
+    fun usersApiService(context: Context): UsersApiService {
+        return usersApiService ?: synchronized(this) {
+            usersApiService ?: RetrofitClient.createUsersApiService(
+                RetrofitClient.createRetrofit(
+                    RetrofitClient.createHttpClientWithTokenManager(getTokenManager(context))
+                )
+            ).also { usersApiService = it }
+        }
+    }
+
     fun availabilityApiService(context: Context): AvailabilityApiService {
         return availabilityApiService ?: synchronized(this) {
             availabilityApiService ?: RetrofitClient.createAvailabilityApiService(
@@ -140,6 +157,17 @@ object ServiceLocator {
             availabilityRepository ?: AvailabilityRepositoryImpl(
                 apiService = availabilityApiService(context)
             ).also { availabilityRepository = it }
+        }
+    }
+
+    fun courseDetailRepository(context: Context): CourseDetailRepository {
+        return courseDetailRepository ?: synchronized(this) {
+            courseDetailRepository ?: CourseDetailRepositoryImpl(
+                subjectsApiService = subjectsApiService(context),
+                cacheDatabase = cacheDatabase(context),
+                memoryCache = inMemoryCache(),
+                userPreferences = userPreferences(context)
+            ).also { courseDetailRepository = it }
         }
     }
 

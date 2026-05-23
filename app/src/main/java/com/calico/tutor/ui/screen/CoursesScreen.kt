@@ -27,6 +27,7 @@ import com.calico.tutor.data.dto.response.AvailableCourseResponse
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.CoursesState
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.screen.DatabaseHelper
 import android.content.Context
 import android.util.Log
@@ -35,7 +36,8 @@ import android.util.Log
 fun CoursesScreen(
     tutorId: String = "sFKRihEeWNMKFctnnCM0n9CjXqo1",
     context: Context? = null,
-    viewModel: CoursesViewModel? = null
+    viewModel: CoursesViewModel? = null,
+    onCourseSelected: ((String) -> Unit)? = null
 ) {
     val coursesState by viewModel?.coursesState?.collectAsState() ?: remember { mutableStateOf<CoursesState>(CoursesState.Idle) }
     val isApplying by viewModel?.isApplying?.collectAsState() ?: remember { mutableStateOf(false) }
@@ -131,19 +133,10 @@ fun CoursesScreen(
                 }
                 is CoursesState.Success -> {
                     if (state.isOffline) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
-                        ) {
-                            Text(
-                                text = "Viewing offline data. Check your connection.",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFFF57C00),
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
+                        OfflineBanner(
+                            message = "Viewing offline data. Check your connection.",
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
                     }
 
                     if (state.approvedCourses.isNotEmpty()) {
@@ -154,7 +147,10 @@ fun CoursesScreen(
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 state.approvedCourses.forEach { course ->
-                                    ApprovedCourseCardCompact(course)
+                                    ApprovedCourseCardCompact(
+                                        course = course,
+                                        onClick = { onCourseSelected?.invoke(course.id) }
+                                    )
                                 }
                             }
                         }
@@ -174,6 +170,7 @@ fun CoursesScreen(
                                     val isApplied = course.hasApplied || hasApiApplication || hasPendingApplication
                                     AvailableCourseCardCompact(
                                         course = course.copy(hasApplied = isApplied),
+                                        onCardClick = { onCourseSelected?.invoke(course.id) },
                                         onApplyClick = {
                                             selectedCourseForApplication = course
                                             showApplicationDialog = true
@@ -291,10 +288,14 @@ private fun CollapsibleSection(
 }
 
 @Composable
-private fun ApprovedCourseCardCompact(course: TutorCourseData) {
+private fun ApprovedCourseCardCompact(
+    course: TutorCourseData,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -346,11 +347,13 @@ private fun ApprovedCourseCardCompact(course: TutorCourseData) {
 @Composable
 private fun AvailableCourseCardCompact(
     course: AvailableCourseResponse,
+    onCardClick: () -> Unit,
     onApplyClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onCardClick)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
