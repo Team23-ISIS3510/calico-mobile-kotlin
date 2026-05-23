@@ -17,9 +17,11 @@ import com.calico.tutor.data.repository.TelemetryRepository
 import com.calico.tutor.data.repository.AuthRepositoryImpl
 import com.calico.tutor.data.repository.AnalyticsRepositoryImpl
 import com.calico.tutor.data.repository.AvailabilityRepositoryImpl
+import com.calico.tutor.data.repository.CourseDetailRepositoryImpl
 import com.calico.tutor.domain.repository.AuthRepository
 import com.calico.tutor.domain.repository.AnalyticsRepository
 import com.calico.tutor.domain.repository.AvailabilityRepository
+import com.calico.tutor.domain.repository.CourseDetailRepository
 import com.calico.tutor.domain.usecase.GetAuthTokenUseCase
 import com.calico.tutor.domain.usecase.LoginUseCase
 import com.calico.tutor.domain.usecase.RegisterUseCase
@@ -82,6 +84,8 @@ object ServiceLocator {
     private var analyticsRepository: AnalyticsRepository? = null
     @Volatile
     private var availabilityRepository: AvailabilityRepository? = null
+    @Volatile
+    private var courseDetailRepository: CourseDetailRepository? = null
     @Volatile
     private var _telemetryRepository: TelemetryRepository? = null
 
@@ -153,6 +157,17 @@ object ServiceLocator {
             availabilityRepository ?: AvailabilityRepositoryImpl(
                 apiService = availabilityApiService(context)
             ).also { availabilityRepository = it }
+        }
+    }
+
+    fun courseDetailRepository(context: Context): CourseDetailRepository {
+        return courseDetailRepository ?: synchronized(this) {
+            courseDetailRepository ?: CourseDetailRepositoryImpl(
+                subjectsApiService = subjectsApiService(context),
+                cacheDatabase = cacheDatabase(context),
+                memoryCache = inMemoryCache(),
+                userPreferences = userPreferences(context)
+            ).also { courseDetailRepository = it }
         }
     }
 

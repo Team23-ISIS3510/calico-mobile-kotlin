@@ -4,9 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.calico.tutor.data.cache.InMemoryCache
 import com.calico.tutor.data.dto.response.TutoringSessionData
-import com.calico.tutor.data.dto.response.TutoringSessionsResponse
 import com.calico.tutor.data.dto.response.UserProfileResponse
 import com.calico.tutor.data.local.CacheDatabase
+import com.calico.tutor.data.local.FileManager
 import com.calico.tutor.data.local.UserPreferencesDataStore
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.domain.model.Session
@@ -24,57 +24,128 @@ import java.util.Locale
 
 internal object HistoryCacheLoader {
     private const val TAG = "HistoryCacheLoader"
-    private const val KEY_TUTOR_SUBJECTS = "history_subjects"
     private const val KEY_USER_PREFIX = "history_user_"
     private val completedStatuses = setOf("completed", "approved", "done", "finished", "past")
 
-    suspend fun loadTutorHistory(
+    // ─────────────────────────────────────────────────────────────────────────
+    // PASO 1 del patrón stale-while-revalidate:
+    // Lee únicamente desde caché local (L1 → L2) SIN tocar la red.
+    // Devuelve null si no existe ningún dato local (cache miss total).
+    // Dispatchers.IO: SQLite no puede ejecutarse en Main Thread.
+    // ─────────────────────────────────────────────────────────────────────────
+    @Suppress("UNCHECKED_CAST")
+    suspend fun readCachedTutorHistory(
         context: Context,
         cacheDb: CacheDatabase,
         memoryCache: InMemoryCache,
         userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
         gson: Gson,
+        tutorId: String
+    ): HistoryState? = withContext(Dispatchers.IO) {
+        val cacheKey = buildTutorCacheKey(tutorId)
+        val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
+
+        // L1: InMemoryCache (LRU)
+        memoryCache.get(cacheKey)?.let { entry ->
+            Log.d(TAG, "History: cache hit L1 (memoria) para $tutorId")
+            val sessions = entry.value as List<TutoringSessionData>
+            return@withContext HistoryState.Success(
+                mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
+            )
+        }
+
+        // L2: SQLite
+        val (cachedJson, _) = cacheDb.getCache(cacheKey)
+        cachedJson?.let {
+            Log.d(TAG, "History: cache hit L2 (SQLite) para $tutorId — puede ser stale")
+            val sessions = gson.fromJson<List<TutoringSessionData>>(it, sessionType)
+            memoryCache.put(cacheKey, sessions)
+            return@withContext HistoryState.Success(
+                mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
+            )
+        }
+
+        null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    suspend fun readCachedStudentHistory(
+        context: Context,
+        cacheDb: CacheDatabase,
+        memoryCache: InMemoryCache,
+        userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
+        gson: Gson,
+        studentId: String,
+        startDate: String? = null,
+        endDate: String? = null,
+        course: String? = null,
+        limit: Int? = null
+    ): HistoryState? = withContext(Dispatchers.IO) {
+        val cacheKey = buildStudentCacheKey(studentId, startDate, endDate, course, limit)
+        val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
+
+        // L1: InMemoryCache (LRU)
+        memoryCache.get(cacheKey)?.let { entry ->
+            Log.d(TAG, "History: cache hit L1 (memoria) para student $studentId")
+            val sessions = entry.value as List<TutoringSessionData>
+            return@withContext HistoryState.Success(
+                mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
+            )
+        }
+
+        // L2: SQLite
+        val (cachedJson, _) = cacheDb.getCache(cacheKey)
+        cachedJson?.let {
+            Log.d(TAG, "History: cache hit L2 (SQLite) para student $studentId")
+            val sessions = gson.fromJson<List<TutoringSessionData>>(it, sessionType)
+            memoryCache.put(cacheKey, sessions)
+            return@withContext HistoryState.Success(
+                mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
+            )
+        }
+
+        null
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PASO 2 del patrón stale-while-revalidate:
+    // Llama a la API, guarda resultado en SQLite (L2) e InMemoryCache (L1),
+    // y registra el evento en FileManager.
+    // ─────────────────────────────────────────────────────────────────────────
+    suspend fun fetchAndCacheTutorHistory(
+        context: Context,
+        cacheDb: CacheDatabase,
+        memoryCache: InMemoryCache,
+        fileManager: FileManager,
+        gson: Gson,
+        userPrefs: UserPreferencesDataStore,
         tutorId: String
     ): HistoryState = withContext(Dispatchers.IO) {
         val cacheKey = buildTutorCacheKey(tutorId)
-        loadHistory(
-            context = context,
-            cacheDb = cacheDb,
-            memoryCache = memoryCache,
-            userPrefs = userPrefs,
-            gson = gson,
-            cacheKey = cacheKey,
-            fetcher = {
-                coroutineScope {
-                    val sessionsDeferred = async {
-                        ServiceLocator.subjectsApiService(context).getPreviousTutoringSessionsForTutor(tutorId)
-                    }
-                    val subjectWarmupDeferred = async {
-                        runCatching {
-                            ServiceLocator.subjectsApiService(context).getTutorSessionHistory(tutorId)
-                        }.getOrNull()
-                    }
+        val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
 
-                    val sessionResponse = sessionsDeferred.await()
-                    subjectWarmupDeferred.await()?.let {
-                        cacheDb.saveCache(
-                            KEY_TUTOR_SUBJECTS + "_$tutorId",
-                            gson.toJson(it)
-                        )
-                    }
+        val response = ServiceLocator.subjectsApiService(context)
+            .getPreviousTutoringSessionsForTutor(tutorId)
+        val sessions = response.sessions
 
-                    sessionResponse
-                }
-            }
+        cacheDb.saveCache(cacheKey, gson.toJson(sessions, sessionType))
+        memoryCache.put(cacheKey, sessions)
+        fileManager.appendLog("History actualizada de red para $tutorId (stale-while-revalidate)")
+
+        HistoryState.Success(
+            mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
         )
     }
 
-    suspend fun loadStudentHistory(
+    suspend fun fetchAndCacheStudentHistory(
         context: Context,
         cacheDb: CacheDatabase,
         memoryCache: InMemoryCache,
-        userPrefs: UserPreferencesDataStore,
+        fileManager: FileManager,
         gson: Gson,
+        userPrefs: UserPreferencesDataStore,
         studentId: String,
         startDate: String? = null,
         endDate: String? = null,
@@ -82,68 +153,24 @@ internal object HistoryCacheLoader {
         limit: Int? = null
     ): HistoryState = withContext(Dispatchers.IO) {
         val cacheKey = buildStudentCacheKey(studentId, startDate, endDate, course, limit)
-        loadHistory(
-            context = context,
-            cacheDb = cacheDb,
-            memoryCache = memoryCache,
-            userPrefs = userPrefs,
-            gson = gson,
-            cacheKey = cacheKey,
-            fetcher = {
-                ServiceLocator.subjectsApiService(context).getStudentTutoringSessionsHistory(
-                    studentId = studentId,
-                    startDate = startDate,
-                    endDate = endDate,
-                    course = course,
-                    limit = limit
-                )
-            }
-        )
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun loadHistory(
-        context: Context,
-        cacheDb: CacheDatabase,
-        memoryCache: InMemoryCache,
-        userPrefs: UserPreferencesDataStore,
-        gson: Gson,
-        cacheKey: String,
-        fetcher: suspend () -> TutoringSessionsResponse
-    ): HistoryState {
-        val expiryMs = userPrefs.cacheExpiryMs.first()
         val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
 
-        memoryCache.get(cacheKey)?.let { entry ->
-            Log.d(TAG, "History: L1 cache hit for $cacheKey")
-            val sessions = entry.value as List<TutoringSessionData>
-            return HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
-        }
+        val response = ServiceLocator.subjectsApiService(context).getStudentTutoringSessionsHistory(
+            studentId = studentId,
+            startDate = startDate,
+            endDate = endDate,
+            course = course,
+            limit = limit
+        )
+        val sessions = response.sessions
 
-        val (cachedJson, cachedTs) = cacheDb.getCache(cacheKey)
-        val isFresh = (System.currentTimeMillis() - cachedTs) < expiryMs
+        cacheDb.saveCache(cacheKey, gson.toJson(sessions, sessionType))
+        memoryCache.put(cacheKey, sessions)
+        fileManager.appendLog("History actualizada de red para student $studentId (stale-while-revalidate)")
 
-        if (cachedJson != null && isFresh) {
-            Log.d(TAG, "History: L2 cache hit (fresh) for $cacheKey")
-            val sessions = gson.fromJson<List<TutoringSessionData>>(cachedJson, sessionType)
-            memoryCache.put(cacheKey, sessions)
-            return HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
-        }
-
-        return try {
-            val response = fetcher()
-            val sessions = response.sessions
-            cacheDb.saveCache(cacheKey, gson.toJson(sessions, sessionType))
-            memoryCache.put(cacheKey, sessions)
-            HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
-        } catch (e: Exception) {
-            Log.e(TAG, "History network error for $cacheKey: ${e.message}")
-            cachedJson?.let {
-                val sessions = gson.fromJson<List<TutoringSessionData>>(it, sessionType)
-                memoryCache.put(cacheKey, sessions)
-                HistoryState.Success(mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions))
-            } ?: HistoryState.Error("Failed to load tutoring history.")
-        }
+        HistoryState.Success(
+            mapCompletedSessions(context, cacheDb, memoryCache, userPrefs, gson, sessions)
+        )
     }
 
     private suspend fun mapCompletedSessions(
@@ -166,6 +193,9 @@ internal object HistoryCacheLoader {
             .mapNotNull { it.studentId.takeIf(String::isNotBlank) }
             .distinct()
 
+        // Resolución concurrente de perfiles: una corrutina async por cada estudiante único,
+        // todas corriendo en paralelo en Dispatchers.IO. awaitAll() garantiza que ninguna
+        // sesión se mapee antes de tener todos los perfiles resueltos.
         val resolvedUsers = coroutineScope {
             uniqueStudentIds
                 .map { studentId ->

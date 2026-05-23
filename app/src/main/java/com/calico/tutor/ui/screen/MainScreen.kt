@@ -33,6 +33,7 @@ fun MainScreen(
     var editingItem by remember { mutableStateOf<AvailabilityItem?>(null) }
     var showTopSubjects by remember { mutableStateOf(false) }
     var showHotSlots by remember { mutableStateOf(false) }
+    var selectedCourseId by remember { mutableStateOf<String?>(null) }
     val remoteLogoUrl = "https://drive.google.com/uc?export=view&id=1GSBZCG-KGNDq2lHk3VpVR_88lmHmEjy8"
 
     val navItems = listOf(
@@ -72,6 +73,17 @@ fun MainScreen(
                 }
             )
         }
+        currentRoute == "course_detail" && selectedCourseId != null -> {
+            CourseDetailScreen(
+                courseId = selectedCourseId!!,
+                tutorId = tutorId,
+                context = context,
+                onBack = {
+                    selectedCourseId = null
+                    currentRoute = "courses"
+                }
+            )
+        }
         else -> {
             Scaffold(
                 bottomBar = {
@@ -99,7 +111,11 @@ fun MainScreen(
                         "courses" -> CoursesScreen(
                             tutorId = tutorId,
                             context = context,
-                            viewModel = remember { CoursesViewModel(context, DatabaseHelper(context)) }
+                            viewModel = remember { CoursesViewModel(context, DatabaseHelper(context)) },
+                            onCourseSelected = { courseId ->
+                                selectedCourseId = courseId
+                                currentRoute = "course_detail"
+                            }
                         )
                         "availability" -> AvailabilityScreen(
                             context = context,

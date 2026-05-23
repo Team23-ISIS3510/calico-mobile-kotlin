@@ -74,6 +74,7 @@ fun HistoryScreen(
     val isOnline by viewModel.isOnline.collectAsState()
 
     LaunchedEffect(tutorId) {
+        viewModel.reportHistoryViewOpened(tutorId)
         viewModel.loadTutorHistory(tutorId)
         viewModel.startTutorConnectivityMonitoring(tutorId)
     }

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.ProfileState
 import com.calico.tutor.ui.viewmodel.ProfileViewModel
@@ -85,19 +86,10 @@ private fun ProfileContent(
             .padding(horizontal = 24.dp)
     ) {
         if (state.isOffline) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
-            ) {
-                Text(
-                    text = "Viewing offline data. Check your connection.",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFFF57C00),
-                    modifier = Modifier.padding(12.dp)
-                )
-            }
+            OfflineBanner(
+                message = "Viewing offline data. Check your connection.",
+                modifier = Modifier.padding(top = 16.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
