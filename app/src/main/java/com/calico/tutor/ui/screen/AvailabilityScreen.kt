@@ -22,7 +22,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.WifiOff
+import com.calico.tutor.ui.component.OfflineBanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -669,33 +669,6 @@ private fun AvailabilityCard(item: AvailabilityItem, onEdit: () -> Unit, onDelet
                 }
             }
         }
-    }
-}
-
-/** Orange banner for any offline state — message is operation-specific. */
-@Composable
-private fun OfflineBanner(message: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFFFF3E0))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.WifiOff,
-            contentDescription = null,
-            tint = PrimaryOrange,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = message,
-            color = PrimaryOrange,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 
