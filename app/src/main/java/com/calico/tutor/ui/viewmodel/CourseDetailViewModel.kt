@@ -191,7 +191,11 @@ class CourseDetailViewModel(
 
         viewModelScope.launch(Dispatchers.Main) {
             val pendingNotes = withContext(Dispatchers.IO) {
-                dbHelper.getPendingCourseNotes()
+                runCatching { dbHelper.getPendingCourseNotes() }
+                    .getOrElse {
+                        Log.e(COURSE_DETAIL_TAG, "Failed to load pending notes: ${it.message}")
+                        emptyList()
+                    }
             }
 
             if (pendingNotes.isEmpty()) return@launch
