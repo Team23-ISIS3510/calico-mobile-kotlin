@@ -86,6 +86,7 @@ internal object HistoryCacheLoader {
         val cacheKey = buildStudentCacheKey(studentId, startDate, endDate, course, limit)
         val sessionType = object : TypeToken<List<TutoringSessionData>>() {}.type
 
+        // L1: InMemoryCache (LRU)
         memoryCache.get(cacheKey)?.let { entry ->
             Log.d(TAG, "History: cache hit L1 (memoria) para student $studentId")
             val sessions = entry.value as List<TutoringSessionData>
@@ -94,6 +95,7 @@ internal object HistoryCacheLoader {
             )
         }
 
+        // L2: SQLite
         val (cachedJson, _) = cacheDb.getCache(cacheKey)
         cachedJson?.let {
             Log.d(TAG, "History: cache hit L2 (SQLite) para student $studentId")
