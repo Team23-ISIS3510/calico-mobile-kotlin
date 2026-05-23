@@ -35,7 +35,8 @@ import android.util.Log
 fun CoursesScreen(
     tutorId: String = "sFKRihEeWNMKFctnnCM0n9CjXqo1",
     context: Context? = null,
-    viewModel: CoursesViewModel? = null
+    viewModel: CoursesViewModel? = null,
+    onCourseSelected: ((String) -> Unit)? = null
 ) {
     val coursesState by viewModel?.coursesState?.collectAsState() ?: remember { mutableStateOf<CoursesState>(CoursesState.Idle) }
     val isApplying by viewModel?.isApplying?.collectAsState() ?: remember { mutableStateOf(false) }
@@ -154,7 +155,10 @@ fun CoursesScreen(
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 state.approvedCourses.forEach { course ->
-                                    ApprovedCourseCardCompact(course)
+                                    ApprovedCourseCardCompact(
+                                        course = course,
+                                        onClick = { onCourseSelected?.invoke(course.id) }
+                                    )
                                 }
                             }
                         }
@@ -174,6 +178,7 @@ fun CoursesScreen(
                                     val isApplied = course.hasApplied || hasApiApplication || hasPendingApplication
                                     AvailableCourseCardCompact(
                                         course = course.copy(hasApplied = isApplied),
+                                        onCardClick = { onCourseSelected?.invoke(course.id) },
                                         onApplyClick = {
                                             selectedCourseForApplication = course
                                             showApplicationDialog = true
@@ -291,10 +296,14 @@ private fun CollapsibleSection(
 }
 
 @Composable
-private fun ApprovedCourseCardCompact(course: TutorCourseData) {
+private fun ApprovedCourseCardCompact(
+    course: TutorCourseData,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -346,11 +355,13 @@ private fun ApprovedCourseCardCompact(course: TutorCourseData) {
 @Composable
 private fun AvailableCourseCardCompact(
     course: AvailableCourseResponse,
+    onCardClick: () -> Unit,
     onApplyClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onCardClick)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)

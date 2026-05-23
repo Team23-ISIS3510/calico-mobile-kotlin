@@ -11,12 +11,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "app_database.db"
-        private const val DATABASE_VERSION = 5
+        private const val DATABASE_VERSION = 6
 
         const val TABLE_COURSES = "courses"
         const val TABLE_APPROVED_COURSES = "approved_courses"
         const val TABLE_APPLICATIONS = "applications"
         const val TABLE_TUTOR_PROFILE = "tutor_profile"
+        const val TABLE_COURSE_NOTES = "course_notes"
+        const val TABLE_PENDING_COURSE_NOTES = "pending_course_notes"
 
         const val COLUMN_COURSE_ID = "id"
         const val COLUMN_COURSE_TITLE = "title"
@@ -27,6 +29,10 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         const val COLUMN_TUTOR_NAME = "name"
         const val COLUMN_TUTOR_EMAIL = "email"
         const val COLUMN_TUTOR_SUBJECT = "subject"
+        const val COLUMN_NOTE_COURSE_ID = "course_id"
+        const val COLUMN_NOTE_TEXT = "note"
+        const val COLUMN_NOTE_IS_FAVORITE = "is_favorite"
+        const val COLUMN_NOTE_UPDATED_AT = "updated_at"
 
         private val CREATE_TABLE_COURSES = (
             "CREATE TABLE $TABLE_COURSES ("
@@ -80,6 +86,24 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             + "profile_image_url TEXT"
             + ")"
         )
+
+        private val CREATE_TABLE_COURSE_NOTES = (
+            "CREATE TABLE $TABLE_COURSE_NOTES ("
+            + "$COLUMN_NOTE_COURSE_ID TEXT PRIMARY KEY, "
+            + "$COLUMN_NOTE_TEXT TEXT, "
+            + "$COLUMN_NOTE_IS_FAVORITE INTEGER NOT NULL DEFAULT 0, "
+            + "$COLUMN_NOTE_UPDATED_AT INTEGER NOT NULL"
+            + ")"
+        )
+
+        private val CREATE_TABLE_PENDING_COURSE_NOTES = (
+            "CREATE TABLE $TABLE_PENDING_COURSE_NOTES ("
+            + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            + "$COLUMN_NOTE_COURSE_ID TEXT NOT NULL, "
+            + "$COLUMN_NOTE_TEXT TEXT, "
+            + "$COLUMN_NOTE_UPDATED_AT INTEGER NOT NULL"
+            + ")"
+        )
     }
 
     override fun onCreate(db: SQLiteDatabase?) {
@@ -88,14 +112,23 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
         db?.execSQL(CREATE_TABLE_APPLICATIONS)
         db?.execSQL(CREATE_TABLE_PENDING_APPLICATIONS)
         db?.execSQL(CREATE_TABLE_TUTOR_PROFILE)
+        db?.execSQL(CREATE_TABLE_COURSE_NOTES)
+        db?.execSQL(CREATE_TABLE_PENDING_COURSE_NOTES)
     }
 
     override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 6) {
+            db?.execSQL(CREATE_TABLE_COURSE_NOTES)
+            db?.execSQL(CREATE_TABLE_PENDING_COURSE_NOTES)
+            return
+        }
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_COURSES")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_APPROVED_COURSES")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_APPLICATIONS")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_PENDING_APPLICATIONS")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_TUTOR_PROFILE")
+        db?.execSQL("DROP TABLE IF EXISTS $TABLE_COURSE_NOTES")
+        db?.execSQL("DROP TABLE IF EXISTS $TABLE_PENDING_COURSE_NOTES")
         onCreate(db)
     }
 
@@ -336,6 +369,20 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
         val createdAt: String
     )
 
+    data class CourseNote(
+        val courseId: String,
+        val note: String? = null,
+        val isFavorite: Boolean = false,
+        val updatedAt: Long = System.currentTimeMillis()
+    )
+
+    data class PendingCourseNote(
+        val id: Long = 0,
+        val courseId: String,
+        val note: String? = null,
+        val updatedAt: Long
+    )
+
     fun savePendingApplication(app: PendingApplication): Long {
         val db = this.writableDatabase
         val values = ContentValues().apply {
@@ -384,6 +431,123 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
         db.close()
     }
 
+    fun upsertCourseNote(note: CourseNote) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NOTE_COURSE_ID, note.courseId)
+            put(COLUMN_NOTE_TEXT, note.note)
+            put(COLUMN_NOTE_IS_FAVORITE, if (note.isFavorite) 1 else 0)
+            put(COLUMN_NOTE_UPDATED_AT, note.updatedAt)
+        }
+        db.insertWithOnConflict(TABLE_COURSE_NOTES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        db.close()
+    }
+
+    fun getCourseNote(courseId: String): CourseNote? {
+        val db = this.readableDatabase
+        val cursor = db.query(
+            TABLE_COURSE_NOTES,
+            arrayOf(COLUMN_NOTE_COURSE_ID, COLUMN_NOTE_TEXT, COLUMN_NOTE_IS_FAVORITE, COLUMN_NOTE_UPDATED_AT),
+            "$COLUMN_NOTE_COURSE_ID = ?",
+            arrayOf(courseId),
+            null,
+            null,
+            null
+        )
+        val result = cursor.use {
+            if (it.moveToFirst()) {
+                CourseNote(
+                    courseId = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_COURSE_ID)),
+                    note = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_TEXT)),
+                    isFavorite = it.getInt(it.getColumnIndexOrThrow(COLUMN_NOTE_IS_FAVORITE)) == 1,
+                    updatedAt = it.getLong(it.getColumnIndexOrThrow(COLUMN_NOTE_UPDATED_AT))
+                )
+            } else {
+                null
+            }
+        }
+        db.close()
+        return result
+    }
+
+    fun getFavoriteCourses(): List<CourseNote> {
+        val favorites = mutableListOf<CourseNote>()
+        val db = this.readableDatabase
+        val cursor = db.query(
+            TABLE_COURSE_NOTES,
+            arrayOf(COLUMN_NOTE_COURSE_ID, COLUMN_NOTE_TEXT, COLUMN_NOTE_IS_FAVORITE, COLUMN_NOTE_UPDATED_AT),
+            "$COLUMN_NOTE_IS_FAVORITE = 1",
+            null,
+            null,
+            null,
+            "$COLUMN_NOTE_UPDATED_AT DESC"
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                favorites.add(
+                    CourseNote(
+                        courseId = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_COURSE_ID)),
+                        note = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_TEXT)),
+                        isFavorite = it.getInt(it.getColumnIndexOrThrow(COLUMN_NOTE_IS_FAVORITE)) == 1,
+                        updatedAt = it.getLong(it.getColumnIndexOrThrow(COLUMN_NOTE_UPDATED_AT))
+                    )
+                )
+            }
+        }
+        db.close()
+        return favorites
+    }
+
+    fun enqueuePendingCourseNote(courseId: String, note: String?, updatedAt: Long = System.currentTimeMillis()): Long {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NOTE_COURSE_ID, courseId)
+            put(COLUMN_NOTE_TEXT, note)
+            put(COLUMN_NOTE_UPDATED_AT, updatedAt)
+        }
+        return db.insert(TABLE_PENDING_COURSE_NOTES, null, values).also { db.close() }
+    }
+
+    fun getPendingCourseNotes(): List<PendingCourseNote> {
+        val pending = mutableListOf<PendingCourseNote>()
+        val db = this.readableDatabase
+        val cursor = db.query(
+            TABLE_PENDING_COURSE_NOTES,
+            arrayOf("id", COLUMN_NOTE_COURSE_ID, COLUMN_NOTE_TEXT, COLUMN_NOTE_UPDATED_AT),
+            null,
+            null,
+            null,
+            null,
+            "$COLUMN_NOTE_UPDATED_AT ASC"
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                pending.add(
+                    PendingCourseNote(
+                        id = it.getLong(it.getColumnIndexOrThrow("id")),
+                        courseId = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_COURSE_ID)),
+                        note = it.getString(it.getColumnIndexOrThrow(COLUMN_NOTE_TEXT)),
+                        updatedAt = it.getLong(it.getColumnIndexOrThrow(COLUMN_NOTE_UPDATED_AT))
+                    )
+                )
+            }
+        }
+        db.close()
+        return pending
+    }
+
+    fun deletePendingCourseNote(id: Long) {
+        val db = this.writableDatabase
+        db.delete(TABLE_PENDING_COURSE_NOTES, "id = ?", arrayOf(id.toString()))
+        db.close()
+    }
+
+    fun deletePendingCourseNotesForCourse(courseId: String) {
+        val db = this.writableDatabase
+        db.delete(TABLE_PENDING_COURSE_NOTES, "$COLUMN_NOTE_COURSE_ID = ?", arrayOf(courseId))
+        db.close()
+    }
+
     fun clearAllTables() {
         Log.d("DB", "Clearing DB")
         val db = this.writableDatabase
@@ -391,6 +555,8 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
         db.delete(TABLE_APPROVED_COURSES, null, null)
         db.delete(TABLE_APPLICATIONS, null, null)
         db.delete(TABLE_TUTOR_PROFILE, null, null)
+        db.delete(TABLE_COURSE_NOTES, null, null)
+        db.delete(TABLE_PENDING_COURSE_NOTES, null, null)
         db.close()
         Log.d("DB", "DB Cleared")
     }
