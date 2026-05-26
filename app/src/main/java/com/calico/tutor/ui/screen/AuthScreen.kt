@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.calico.tutor.R
@@ -15,6 +16,7 @@ import com.calico.tutor.data.datasource.remote.GoogleSignInManager
 import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
+import com.calico.tutor.ui.util.rememberIsOnline
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
@@ -27,6 +29,8 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     val (showLogin, setShowLogin) = remember { mutableStateOf(true) }
     val (errorToShow, setErrorToShow) = remember { mutableStateOf<String?>(null) }
     val (isGoogleLoading, setGoogleLoading) = remember { mutableStateOf(false) }
+
+    val isOnline by rememberIsOnline(context)
 
     val tokenManager = remember { ServiceLocator.provideTokenManager(context) }
 
@@ -165,7 +169,8 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     isGoogleLoading = isGoogleLoading || (authState.value is AuthState.Loading && isGoogleLoading),
                     errorMessage = errorState?.message,
                     isRetryable = errorState?.retryable == true,
-                    onRetry = { viewModel.retryFailedOperation() }
+                    onRetry = { viewModel.retryFailedOperation() },
+                    isOnline = isOnline
                 )
             } else {
                 val errorState = authState.value as? AuthState.Error
@@ -180,7 +185,8 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
                     isLoading = authState.value is AuthState.Loading,
                     errorMessage = errorState?.message,
                     isRetryable = errorState?.retryable == true,
-                    onRetry = { viewModel.retryFailedOperation() }
+                    onRetry = { viewModel.retryFailedOperation() },
+                    isOnline = isOnline
                 )
             }
         }

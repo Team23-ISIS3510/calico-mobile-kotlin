@@ -38,10 +38,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.calico.tutor.R
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.LightGray
+import com.calico.tutor.ui.theme.MediumGray
 import com.calico.tutor.ui.theme.PrimaryOrange
 
 @Composable
@@ -53,7 +56,8 @@ fun LoginScreen(
     isGoogleLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
-    onRetry: (() -> Unit)? = null
+    onRetry: (() -> Unit)? = null,
+    isOnline: Boolean = true
 ) {
     val (email, setEmail) = remember { mutableStateOf("") }
     val (password, setPassword) = remember { mutableStateOf("") }
@@ -64,14 +68,24 @@ fun LoginScreen(
             .fillMaxSize()
             .background(CreamBackground)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 32.dp, vertical = 48.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (!isOnline) {
+                Spacer(modifier = Modifier.height(24.dp))
+                OfflineBanner(
+                    message = "No internet connection. Please check your connection to continue.",
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 32.dp)
+                    .padding(top = if (isOnline) 48.dp else 24.dp, bottom = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
             Spacer(modifier = Modifier.height(60.dp))
 
             // Calico Logo (text-based placeholder)
@@ -158,10 +172,12 @@ fun LoginScreen(
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryOrange,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
+                    disabledContainerColor = PrimaryOrange.copy(alpha = 0.35f),
+                    disabledContentColor = Color.Black.copy(alpha = 0.35f)
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
+                enabled = isOnline && !isLoading && email.isNotEmpty() && password.isNotEmpty()
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -189,10 +205,12 @@ fun LoginScreen(
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
+                        disabledContainerColor = LightGray,
+                        disabledContentColor = MediumGray
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !isLoading && !isGoogleLoading,
+                    enabled = isOnline && !isLoading && !isGoogleLoading,
                     border = BorderStroke(1.dp, Color(0xFFE0E0E0))
                 ) {
                     if (isGoogleLoading) {
@@ -265,6 +283,8 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(40.dp))
+        }
+
         }
     }
 }
