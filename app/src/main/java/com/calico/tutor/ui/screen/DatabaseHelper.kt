@@ -431,6 +431,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             put(COLUMN_NOTE_UPDATED_AT, note.updatedAt)
         }
         db.insertWithOnConflict(TABLE_COURSE_NOTES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        db.close()
     }
 
     fun getCourseNote(courseId: String): CourseNote? {
@@ -456,6 +457,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 null
             }
         }
+        db.close()
         return result
     }
 
@@ -483,6 +485,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 )
             }
         }
+        db.close()
         return favorites
     }
 
@@ -493,7 +496,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             put(COLUMN_NOTE_TEXT, note)
             put(COLUMN_NOTE_UPDATED_AT, updatedAt)
         }
-        return db.insert(TABLE_PENDING_COURSE_NOTES, null, values)
+        return db.insert(TABLE_PENDING_COURSE_NOTES, null, values).also { db.close() }
     }
 
     fun getPendingCourseNotes(): List<PendingCourseNote> {
@@ -520,17 +523,20 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 )
             }
         }
+        db.close()
         return pending
     }
 
     fun deletePendingCourseNote(id: Long) {
         val db = this.writableDatabase
         db.delete(TABLE_PENDING_COURSE_NOTES, "id = ?", arrayOf(id.toString()))
+        db.close()
     }
 
     fun deletePendingCourseNotesForCourse(courseId: String) {
         val db = this.writableDatabase
         db.delete(TABLE_PENDING_COURSE_NOTES, "$COLUMN_NOTE_COURSE_ID = ?", arrayOf(courseId))
+        db.close()
     }
 
     fun clearAllTables() {
@@ -542,7 +548,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
         db.delete(TABLE_TUTOR_PROFILE, null, null)
         db.delete(TABLE_COURSE_NOTES, null, null)
         db.delete(TABLE_PENDING_COURSE_NOTES, null, null)
-
+        db.close()
         Log.d("DB", "DB Cleared")
     }
 }
