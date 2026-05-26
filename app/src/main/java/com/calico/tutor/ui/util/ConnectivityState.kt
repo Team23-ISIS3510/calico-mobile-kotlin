@@ -6,10 +6,15 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 @Composable
 fun rememberIsOnline(context: Context): State<Boolean> {
@@ -18,38 +23,64 @@ fun rememberIsOnline(context: Context): State<Boolean> {
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     }
 
-    val state = remember(connectivityManager) {
-        mutableStateOf(isCurrentlyOnline(connectivityManager))
+    val initial = remember(connectivityManager) {
+        isCurrentlyOnline(connectivityManager)
     }
 
-    DisposableEffect(connectivityManager) {
-        state.value = isCurrentlyOnline(connectivityManager)
+    val flow = remember(connectivityManager) { connectivityFlow(connectivityManager) }
+
+    return flow.collectAsState(initial = initial)
+}
+
+private fun connectivityFlow(connectivityManager: ConnectivityManager): Flow<Boolean> {
+    return callbackFlow {
+        var lastSent: Boolean? = null
+        var pendingOnlineJob: Job? = null
+
+        fun sendIfChanged(value: Boolean) {
+            if (lastSent == value) return
+            lastSent = value
+            trySend(value)
+        }
+
+        fun updateFromSystem() {
+            val onlineNow = isCurrentlyOnline(connectivityManager)
+            if (!onlineNow) {
+                pendingOnlineJob?.cancel()
+                pendingOnlineJob = null
+                sendIfChanged(false)
+                return
+            }
+
+            // Avoid UI flapping: go offline immediately, but only consider “online” after it’s stable.
+            pendingOnlineJob?.cancel()
+            pendingOnlineJob = launch {
+                delay(750)
+                sendIfChanged(true)
+            }
+        }
+
+        updateFromSystem()
 
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                state.value = isCurrentlyOnline(connectivityManager)
-            }
-
-            override fun onLost(network: Network) {
-                state.value = isCurrentlyOnline(connectivityManager)
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                state.value = isCurrentlyOnline(connectivityManager)
-            }
-
+            override fun onAvailable(network: Network) = updateFromSystem()
+            override fun onLost(network: Network) = updateFromSystem()
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) = updateFromSystem()
             override fun onUnavailable() {
-                state.value = false
+                pendingOnlineJob?.cancel()
+                pendingOnlineJob = null
+                sendIfChanged(false)
             }
         }
 
         connectivityManager.registerNetworkCallback(request, callback)
 
-        onDispose {
+        awaitClose {
+            pendingOnlineJob?.cancel()
             try {
                 connectivityManager.unregisterNetworkCallback(callback)
             } catch (_: Exception) {
@@ -57,8 +88,6 @@ fun rememberIsOnline(context: Context): State<Boolean> {
             }
         }
     }
-
-    return state
 }
 
 private fun isCurrentlyOnline(connectivityManager: ConnectivityManager): Boolean {
