@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -389,7 +387,7 @@ private fun SessionCard(session: Session) {
                 Spacer(Modifier.height(4.dp))
                 Text("Status: ${session.status}", style = MaterialTheme.typography.labelSmall, color = MediumGray)
             }
-            Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "View", tint = PrimaryOrange, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.size(24.dp))
         }
     }
 }
