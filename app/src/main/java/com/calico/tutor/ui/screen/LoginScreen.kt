@@ -14,13 +14,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -31,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -38,10 +44,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.calico.tutor.R
+import com.calico.tutor.ui.component.OfflineBannerDefaults
+import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.theme.BeigeButton
 import com.calico.tutor.ui.theme.BrownText
 import com.calico.tutor.ui.theme.CreamBackground
 import com.calico.tutor.ui.theme.CreamInput
+import com.calico.tutor.ui.theme.LightGray
+import com.calico.tutor.ui.theme.MediumGray
 import com.calico.tutor.ui.theme.PrimaryOrange
 
 @Composable
@@ -53,7 +63,8 @@ fun LoginScreen(
     isGoogleLoading: Boolean = false,
     errorMessage: String? = null,
     isRetryable: Boolean = false,
-    onRetry: (() -> Unit)? = null
+    onRetry: (() -> Unit)? = null,
+    isOnline: Boolean = true
 ) {
     val (email, setEmail) = remember { mutableStateOf("") }
     val (password, setPassword) = remember { mutableStateOf("") }
@@ -64,14 +75,24 @@ fun LoginScreen(
             .fillMaxSize()
             .background(CreamBackground)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 32.dp, vertical = 48.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (!isOnline) {
+                Spacer(modifier = Modifier.height(24.dp))
+                OfflineBanner(
+                    message = "No internet connection. Please check your connection to continue.",
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 32.dp)
+                    .padding(top = if (isOnline) 48.dp else 24.dp, bottom = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
             Spacer(modifier = Modifier.height(60.dp))
 
             // Calico Logo (text-based placeholder)
@@ -155,13 +176,16 @@ fun LoginScreen(
                 onClick = { onLoginClick(email, password) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .alpha(if (isOnline) 1f else 0.75f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryOrange,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
+                    disabledContainerColor = LightGray,
+                    disabledContentColor = MediumGray
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
+                enabled = isOnline && !isLoading && email.isNotEmpty() && password.isNotEmpty()
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -170,11 +194,26 @@ fun LoginScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text(
-                        "Log In",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "Log In",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+
+                        if (!isOnline) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = "Offline",
+                                tint = OfflineBannerDefaults.IconTint,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 8.dp)
+                                    .size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -186,13 +225,16 @@ fun LoginScreen(
                     onClick = onGoogleLoginClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(56.dp)
+                        .alpha(if (isOnline) 1f else 0.75f),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
+                        disabledContainerColor = LightGray,
+                        disabledContentColor = MediumGray
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !isLoading && !isGoogleLoading,
+                    enabled = isOnline && !isLoading && !isGoogleLoading,
                     border = BorderStroke(1.dp, Color(0xFFE0E0E0))
                 ) {
                     if (isGoogleLoading) {
@@ -202,31 +244,45 @@ fun LoginScreen(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .background(Color.White),
-                                contentAlignment = Alignment.Center
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .background(Color.White),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "G",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEA4335)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.size(12.dp))
                                 Text(
-                                    "G",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFEA4335)
+                                    "Sign in with Google",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = LocalContentColor.current
                                 )
                             }
-                            Spacer(modifier = Modifier.size(12.dp))
-                            Text(
-                                "Sign in with Google",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black
-                            )
+
+                            if (!isOnline) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Offline",
+                                    tint = OfflineBannerDefaults.IconTint,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 8.dp)
+                                        .size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -255,16 +311,9 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Forgot Password Link
-            TextButton(onClick = { /* TODO: Implement forgot password */ }) {
-                Text(
-                    "Forgot Password?",
-                    color = BrownText,
-                    fontSize = 14.sp
-                )
-            }
-
             Spacer(modifier = Modifier.height(40.dp))
+        }
+
         }
     }
 }
