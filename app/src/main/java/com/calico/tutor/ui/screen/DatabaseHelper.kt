@@ -149,7 +149,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
-            db.close()
         }
     }
 
@@ -180,7 +179,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 courses.add(course)
             }
         }
-        db.close()
         return courses
     }
 
@@ -200,7 +198,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
-            db.close()
         }
     }
 
@@ -228,7 +225,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 courses.add(course)
             }
         }
-        db.close()
         return courses
     }
 
@@ -239,7 +235,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             put(COLUMN_COURSE_DESCRIPTION, course.description)
             put(COLUMN_COURSE_CATEGORY, course.category)
         }
-        return db.insert(TABLE_COURSES, null, values).also { db.close() }
+        return db.insert(TABLE_COURSES, null, values)
     }
 
     data class Course(
@@ -259,7 +255,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             put(COLUMN_TUTOR_SUBJECT, tutor.subject)
             put("profile_image_url", tutor.profileImageUrl)
         }
-        return db.insert(TABLE_TUTOR_PROFILE, null, values).also { db.close() }
+        return db.insert(TABLE_TUTOR_PROFILE, null, values)
     }
 
     fun getTutorProfiles(): List<TutorProfile> {
@@ -287,7 +283,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 tutors.add(tutor)
             }
         }
-        db.close()
         return tutors
     }
 
@@ -326,7 +321,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
-            db.close()
         }
     }
 
@@ -356,7 +350,6 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 applications.add(app)
             }
         }
-        db.close()
         return applications
     }
 
@@ -392,7 +385,7 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
             put("notes", app.notes)
             put("created_at", app.createdAt)
         }
-        return db.insert(TABLE_PENDING_APPLICATIONS, null, values).also { db.close() }
+        return db.insert(TABLE_PENDING_APPLICATIONS, null, values)
     }
 
     fun getPendingApplications(): List<PendingApplication> {
@@ -421,14 +414,12 @@ private val CREATE_TABLE_TUTOR_PROFILE = (
                 applications.add(app)
             }
         }
-        db.close()
         return applications
     }
 
     fun deletePendingApplication(id: Long) {
         val db = this.writableDatabase
         db.delete(TABLE_PENDING_APPLICATIONS, "id = ?", arrayOf(id.toString()))
-        db.close()
     }
 
     fun upsertCourseNote(note: CourseNote) {

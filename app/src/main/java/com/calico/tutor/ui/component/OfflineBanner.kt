@@ -15,6 +15,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+object OfflineBannerDefaults {
+    val BackgroundColor = Color(0xFFFFF3E0)
+    val IconTint = Color(0xFFE65100)
+    val TextColor = Color(0xFF5D4037)
+}
+
 @Composable
 fun OfflineBanner(
     message: String = "You are currently offline. These are the latest cached data available.",
@@ -24,7 +30,7 @@ fun OfflineBanner(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                color = Color(0xFFFFF3E0),
+                color = OfflineBannerDefaults.BackgroundColor,
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -34,7 +40,7 @@ fun OfflineBanner(
         Icon(
             imageVector = Icons.Default.CloudOff,
             contentDescription = "Offline",
-            tint = Color(0xFFE65100),
+            tint = OfflineBannerDefaults.IconTint,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -42,7 +48,7 @@ fun OfflineBanner(
             text = message,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF5D4037),
+            color = OfflineBannerDefaults.TextColor,
             modifier = Modifier.weight(1f)
         )
     }
