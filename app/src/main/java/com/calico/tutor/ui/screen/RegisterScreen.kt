@@ -281,25 +281,25 @@ fun RegisterScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "Register",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+
                         if (!isOnline) {
                             Icon(
                                 imageVector = Icons.Default.CloudOff,
                                 contentDescription = "Offline",
                                 tint = OfflineBannerDefaults.IconTint,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 16.dp)
+                                    .size(18.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(
-                            "Register",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }

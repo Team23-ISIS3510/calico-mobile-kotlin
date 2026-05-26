@@ -193,25 +193,25 @@ fun LoginScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "Log In",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+
                         if (!isOnline) {
                             Icon(
                                 imageVector = Icons.Default.CloudOff,
                                 contentDescription = "Offline",
                                 tint = OfflineBannerDefaults.IconTint,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 16.dp)
+                                    .size(18.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(
-                            "Log In",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
@@ -243,39 +243,43 @@ fun LoginScreen(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .background(Color.White),
-                                contentAlignment = Alignment.Center
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .background(Color.White),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "G",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEA4335)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.size(12.dp))
                                 Text(
-                                    "G",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFEA4335)
+                                    "Sign in with Google",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Black
                                 )
                             }
-                            Spacer(modifier = Modifier.size(12.dp))
-                            Text(
-                                "Sign in with Google",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black
-                            )
 
                             if (!isOnline) {
-                                Spacer(modifier = Modifier.size(12.dp))
                                 Icon(
                                     imageVector = Icons.Default.CloudOff,
                                     contentDescription = "Offline",
                                     tint = OfflineBannerDefaults.IconTint,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 16.dp)
+                                        .size(18.dp)
                                 )
                             }
                         }
@@ -305,15 +309,6 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Forgot Password Link
-            TextButton(onClick = { /* TODO: Implement forgot password */ }) {
-                Text(
-                    "Forgot Password?",
-                    color = BrownText,
-                    fontSize = 14.sp
-                )
-            }
 
             Spacer(modifier = Modifier.height(40.dp))
         }
