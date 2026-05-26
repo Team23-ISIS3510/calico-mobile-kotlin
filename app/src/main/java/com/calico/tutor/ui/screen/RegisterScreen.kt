@@ -296,7 +296,7 @@ fun RegisterScreen(
                                 tint = OfflineBannerDefaults.IconTint,
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
-                                    .padding(end = 16.dp)
+                                    .padding(end = 8.dp)
                                     .size(18.dp)
                             )
                         }
