@@ -447,6 +447,7 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
                      catch (e: Exception) { try { fmt2.parse(s.scheduledStart)?.time ?: 0L } catch (e2: Exception) { 0L } }
             Session(
                 id             = s.id,
+                studentId      = s.studentId,
                 scheduledStart = s.scheduledStart,
                 scheduledEnd   = s.scheduledEnd,
                 status         = s.status,
@@ -456,7 +457,10 @@ class HomeScreenViewModel(private val context: Context) : ViewModel() {
                 time           = s.scheduledStart,
                 tutorName      = "",
                 subjectName    = s.course ?: s.courseId ?: "Unknown",
-                subjectCode    = ""
+                subjectCode    = "",
+                studentName    = s.studentName,
+                studentAvatarUrl = s.studentAvatarUrl,
+                price          = s.price
             ) to ms
         }
         val previous = mapped.filter { it.second < now }.sortedByDescending { it.second }.map { it.first }

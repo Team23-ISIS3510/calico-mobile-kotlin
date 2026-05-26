@@ -17,6 +17,7 @@ import com.calico.tutor.di.ServiceLocator
 import com.calico.tutor.ui.viewmodel.AuthState
 import com.calico.tutor.ui.viewmodel.AuthViewModel
 import com.calico.tutor.ui.util.rememberIsOnline
+import com.calico.tutor.util.JwtUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
@@ -129,15 +130,18 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
     // Routing según AuthState
     when (val state = authState.value) {
         is AuthState.Success -> {
-            val email = tokenManager.getEmail() ?: state.token.idToken
+            val idToken = tokenManager.getIdToken() ?: state.token.idToken
+            val firebaseUid = JwtUtils.extractFirebaseUid(idToken)
+            val email = tokenManager.getEmail() ?: JwtUtils.extractEmail(idToken) ?: ""
             val userName = email
+                .ifBlank { "User" }
                 .substringBefore("@")
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 
             MainScreen(
                 userName = userName,
-                tutorId = email,
-                userEmail = email,
+                tutorId = firebaseUid ?: email,
+                userEmail = email.ifBlank { "unknown" },
                 context = context,
                 onLogout = { viewModel.resetState() }
             )
