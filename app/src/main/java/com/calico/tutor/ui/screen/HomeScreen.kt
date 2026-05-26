@@ -368,7 +368,9 @@ private fun SessionCard(session: Session) {
             ?.let { disp.format(it) } ?: "Date TBD"
     } catch (e: Exception) { "Date TBD" }
 
-    val courseName = session.course ?: session.courseId ?: "Unknown Course"
+    val subjectName = session.subjectName
+        .ifBlank { session.course ?: session.courseId ?: "Unknown Subject" }
+    val studentDisplayName = session.studentName.ifBlank { "Unknown student" }
 
     Card(
         modifier = Modifier.fillMaxWidth().shadow(elevation = 2.dp),
@@ -381,11 +383,28 @@ private fun SessionCard(session: Session) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(formattedDateTime, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.Black)
-                Spacer(Modifier.height(8.dp))
-                Text(courseName, style = MaterialTheme.typography.labelSmall, color = PrimaryOrange, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = subjectName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryOrange,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = formattedDateTime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MediumGray,
+                    maxLines = 1
+                )
                 Spacer(Modifier.height(4.dp))
-                Text("Status: ${session.status}", style = MaterialTheme.typography.labelSmall, color = MediumGray)
+                Text(
+                    text = studentDisplayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MediumGray,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
             }
             Spacer(modifier = Modifier.size(24.dp))
         }
