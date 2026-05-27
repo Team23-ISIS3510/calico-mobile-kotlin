@@ -24,9 +24,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -35,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -68,10 +70,10 @@ fun CourseDetailScreen(
     val uiState by vm.uiState.collectAsState()
     val isOnline by vm.isOnline.collectAsState()
     val isSaving by vm.isSaving.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var noteText by rememberSaveable(courseId) { mutableStateOf("") }
     var noteDirty by rememberSaveable(courseId) { mutableStateOf(false) }
-    var favorite by rememberSaveable(courseId) { mutableStateOf(false) }
 
     LaunchedEffect(courseId, tutorId) {
         vm.load(courseId, tutorId)
@@ -82,8 +84,13 @@ fun CourseDetailScreen(
         if (state is CourseDetailState.Success) {
             if (!noteDirty) {
                 noteText = state.noteState.text
-                favorite = state.noteState.isFavorite
             }
+        }
+    }
+
+    LaunchedEffect(vm) {
+        vm.snackbarMessages.collect { message ->
+            snackbarHostState.showSnackbar(message)
         }
     }
 
@@ -99,7 +106,8 @@ fun CourseDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
-        containerColor = Color(0xFFF8F8F8)
+        containerColor = Color(0xFFF8F8F8),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -145,7 +153,6 @@ fun CourseDetailScreen(
                         CourseHeaderCard(state.course)
                         NotesCard(
                             noteText = noteText,
-                            favorite = favorite,
                             isSaving = isSaving,
                             isPendingSync = state.noteState.isPendingSync,
                             onNoteChange = {
@@ -155,10 +162,6 @@ fun CourseDetailScreen(
                             onSave = {
                                 vm.saveNote(noteText)
                                 noteDirty = false
-                            },
-                            onFavoriteToggle = { newValue ->
-                                favorite = newValue
-                                vm.toggleFavorite(newValue)
                             }
                         )
                         SessionsCard(state.recentSessions)
@@ -205,12 +208,10 @@ private fun CourseHeaderCard(course: com.calico.tutor.domain.model.CourseDetail)
 @Composable
 private fun NotesCard(
     noteText: String,
-    favorite: Boolean,
     isSaving: Boolean,
     isPendingSync: Boolean,
     onNoteChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onFavoriteToggle: (Boolean) -> Unit
+    onSave: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -226,9 +227,6 @@ private fun NotesCard(
                 label = { Text("Course note") }
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onFavoriteToggle(!favorite) }) {
-                    Text(if (favorite) "Favorite" else "Mark favorite")
-                }
                 Button(
                     onClick = onSave,
                     enabled = !isSaving,

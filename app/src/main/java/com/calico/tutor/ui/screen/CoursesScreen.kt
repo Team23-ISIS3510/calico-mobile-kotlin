@@ -28,6 +28,7 @@ import com.calico.tutor.ui.theme.*
 import com.calico.tutor.ui.viewmodel.CoursesState
 import com.calico.tutor.ui.viewmodel.CoursesViewModel
 import com.calico.tutor.ui.component.OfflineBanner
+import com.calico.tutor.ui.util.rememberIsOnline
 import com.calico.tutor.ui.screen.DatabaseHelper
 import android.content.Context
 import android.util.Log
@@ -48,9 +49,21 @@ fun CoursesScreen(
     var expandedApproved by remember { mutableStateOf(true) }
     var expandedAvailable by remember { mutableStateOf(true) }
     var expandedPending by remember { mutableStateOf(true) }
+    val isOnline by (context?.let { rememberIsOnline(it) } ?: remember { mutableStateOf(true) })
+    var wasOnline by remember { mutableStateOf<Boolean?>(null) }
 
     LaunchedEffect(tutorId) {
         viewModel?.loadData(tutorId)
+    }
+
+    LaunchedEffect(isOnline) {
+        val previous = wasOnline
+        if (previous != null && previous && !isOnline) {
+            viewModel?.loadData(tutorId, preservePending = true)
+        } else if (previous != null && !previous && isOnline) {
+            viewModel?.loadData(tutorId, preservePending = true)
+        }
+        wasOnline = isOnline
     }
 
     // Close dialog when application is queued/submitted
@@ -132,7 +145,7 @@ fun CoursesScreen(
                     }
                 }
                 is CoursesState.Success -> {
-                    if (state.isOffline) {
+                    if (!isOnline || state.isOffline) {
                         OfflineBanner(
                             message = "Viewing offline data. Check your connection.",
                             modifier = Modifier.padding(bottom = 12.dp)
