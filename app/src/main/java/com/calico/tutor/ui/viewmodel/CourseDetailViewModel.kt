@@ -26,8 +26,10 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,7 +40,6 @@ private const val COURSE_DETAIL_TAG = "CourseDetailVM"
 
 data class CourseNoteUiState(
     val text: String = "",
-    val isFavorite: Boolean = false,
     val isPendingSync: Boolean = false,
     val updatedAt: Long = 0L
 )
@@ -75,6 +76,9 @@ class CourseDetailViewModel(
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _snackbarMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val snackbarMessages = _snackbarMessages.asSharedFlow()
 
     private var currentCourseId: String = ""
     private var currentTutorId: String = ""
@@ -115,8 +119,13 @@ class CourseDetailViewModel(
                     }
                 }
                 is Result.Error -> {
+                    val message = if (!isConnected()) {
+                        "No cached data available. Connect to the internet to load this course."
+                    } else {
+                        "Unable to load course detail. Please try again."
+                    }
                     _uiState.value = CourseDetailState.Error(
-                        detailResult.message ?: "Unable to load course detail"
+                        message
                     )
                 }
                 Result.Loading -> {
@@ -148,8 +157,11 @@ class CourseDetailViewModel(
                 if (isConnected()) {
                     val result = repository.updateCourseNote(tutorId, courseId, noteText)
                     when (result) {
-                        is Result.Success -> withContext(Dispatchers.IO) {
-                            dbHelperDeletePendingNote(courseId)
+                        is Result.Success -> {
+                            withContext(Dispatchers.IO) {
+                                dbHelperDeletePendingNote(courseId)
+                            }
+                            _snackbarMessages.tryEmit("Saved")
                         }
                         is Result.Error -> withContext(Dispatchers.IO) {
                             dbHelperEnqueuePendingNote(courseId, noteText, updated.updatedAt)
@@ -160,28 +172,12 @@ class CourseDetailViewModel(
                     withContext(Dispatchers.IO) {
                         dbHelperEnqueuePendingNote(courseId, noteText, updated.updatedAt)
                     }
+                    _snackbarMessages.tryEmit("Saved offline. Will sync when online.")
                 }
                 refreshUiAfterLocalChange(courseId, tutorId)
             } finally {
                 _isSaving.value = false
             }
-        }
-    }
-
-    fun toggleFavorite(isFavorite: Boolean) {
-        val courseId = currentCourseId
-        if (courseId.isBlank()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val current = loadCourseNote(courseId, currentTutorId)
-            dbUpsertNote(
-                courseId = courseId,
-                noteState = current.copy(
-                    isFavorite = isFavorite,
-                    updatedAt = System.currentTimeMillis(),
-                    isPendingSync = current.isPendingSync
-                )
-            )
-            refreshUiAfterLocalChange(courseId, currentTutorId)
         }
     }
 
@@ -212,9 +208,7 @@ class CourseDetailViewModel(
                             dbHelper.deletePendingCourseNote(pending.id)
                             val local = dbHelper.getCourseNote(pending.courseId)
                             if (local != null) {
-                                dbHelper.upsertCourseNote(
-                                    local.copy(isFavorite = local.isFavorite)
-                                )
+                                dbHelper.upsertCourseNote(local)
                             }
                         }
                     }
@@ -378,7 +372,6 @@ class CourseDetailViewModel(
 
         return CourseNoteUiState(
             text = text,
-            isFavorite = local?.isFavorite ?: false,
             isPendingSync = pending,
             updatedAt = local?.updatedAt ?: 0L
         )
@@ -403,7 +396,6 @@ class CourseDetailViewModel(
                 DatabaseHelper.CourseNote(
                     courseId = courseId,
                     note = noteState.text,
-                    isFavorite = noteState.isFavorite,
                     updatedAt = noteState.updatedAt
                 )
             )

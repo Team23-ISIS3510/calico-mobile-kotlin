@@ -223,6 +223,7 @@ class CoursesViewModel(
                 }
                 val approvedToCache = approvedCourses.map { course ->
                     DatabaseHelper.Course(
+                        apiId = course.id,
                         title = course.name,
                         description = course.code,
                         category = course.credits.toString()
@@ -310,7 +311,7 @@ class CoursesViewModel(
 
         val localApprovedCourses = localApproved.map { course ->
             TutorCourseData(
-                id = course.id.toString(),
+                id = course.apiId ?: course.id.toString(),
                 name = course.title,
                 code = course.description ?: "",
                 credits = course.category?.toIntOrNull() ?: 0
