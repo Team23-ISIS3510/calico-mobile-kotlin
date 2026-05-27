@@ -56,7 +56,11 @@ private fun connectivityFlow(connectivityManager: ConnectivityManager): Flow<Boo
             pendingOnlineJob?.cancel()
             pendingOnlineJob = launch {
                 delay(750)
-                sendIfChanged(true)
+                if (isCurrentlyOnline(connectivityManager)) {
+                    sendIfChanged(true)
+                } else {
+                    sendIfChanged(false)
+                }
             }
         }
 
@@ -64,6 +68,7 @@ private fun connectivityFlow(connectivityManager: ConnectivityManager): Flow<Boo
 
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             .build()
 
         val callback = object : ConnectivityManager.NetworkCallback() {
