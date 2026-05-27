@@ -95,7 +95,7 @@ fun RegisterScreen(
 
             if (!isOnline) {
                 OfflineBanner(
-                    message = "No tienes internet, conectate e intenta nuevamente.",
+                    message = "You have no internet connection. Connect and try again.",
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))

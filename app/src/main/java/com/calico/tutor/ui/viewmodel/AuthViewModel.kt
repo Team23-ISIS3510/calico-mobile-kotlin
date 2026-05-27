@@ -26,7 +26,7 @@ sealed class AuthState {
     data class Error(val message: String, val retryable: Boolean = true) : AuthState()
 }
 
-private const val NO_INTERNET_AUTH_MESSAGE = "No tienes internet, conectate e intenta nuevamente"
+private const val NO_INTERNET_AUTH_MESSAGE = "You have no internet connection. Connect and try again."
 
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
