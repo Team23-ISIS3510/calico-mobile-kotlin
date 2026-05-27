@@ -134,6 +134,7 @@ fun MainScreen(
                             onNavigateBack = { currentRoute = "home" }
                         )
                         "profile" -> ProfileScreen(
+                            context = context,
                             viewModel = remember { ProfileViewModel(context) },
                             onLogout = onLogout
                         )

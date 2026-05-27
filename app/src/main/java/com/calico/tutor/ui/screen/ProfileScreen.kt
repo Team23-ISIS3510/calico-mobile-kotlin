@@ -11,9 +11,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,16 +29,19 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.calico.tutor.ui.component.OfflineBanner
 import com.calico.tutor.ui.theme.*
+import com.calico.tutor.ui.util.rememberIsOnline
 import com.calico.tutor.ui.viewmodel.ProfileState
 import com.calico.tutor.ui.viewmodel.ProfileViewModel
 import java.io.File
 
 @Composable
 fun ProfileScreen(
+    context: Context,
     viewModel: ProfileViewModel? = null,
     onLogout: () -> Unit = {}
 ) {
     val profileState = viewModel?.profileState?.collectAsState()?.value ?: ProfileState.Idle
+    val isOnline by rememberIsOnline(context)
 
     LaunchedEffect(Unit) {
         viewModel?.loadProfile()
@@ -59,6 +64,7 @@ fun ProfileScreen(
             is ProfileState.Success -> {
                 ProfileContent(
                     state = state,
+                    isOnline = isOnline,
                     onLogout = onLogout
                 )
             }
@@ -77,6 +83,7 @@ fun ProfileScreen(
 @Composable
 private fun ProfileContent(
     state: ProfileState.Success,
+    isOnline: Boolean,
     onLogout: () -> Unit
 ) {
     Column(
@@ -85,7 +92,7 @@ private fun ProfileContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
-        if (state.isOffline) {
+        if (!isOnline || state.isOffline) {
             OfflineBanner(
                 message = "Viewing offline data. Check your connection.",
                 modifier = Modifier.padding(top = 16.dp)
