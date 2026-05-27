@@ -179,8 +179,8 @@ fun AuthScreen(viewModel: AuthViewModel, context: Context, activity: androidx.ac
             } else {
                 val errorState = authState.value as? AuthState.Error
                 RegisterScreen(
-                    onRegisterClick = { email, password, name, phone, isTutor ->
-                        viewModel.register(email, password, name, phone, isTutor)
+                    onRegisterClick = { email, password, name, phone ->
+                        viewModel.register(email, password, name, phone, true)
                     },
                     onBackClick = {
                         setShowLogin(true)

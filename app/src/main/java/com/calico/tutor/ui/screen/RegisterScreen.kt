@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,7 +56,7 @@ import com.calico.tutor.ui.theme.PrimaryOrange
 
 @Composable
 fun RegisterScreen(
-    onRegisterClick: (String, String, String, String, Boolean) -> Unit,
+    onRegisterClick: (String, String, String, String) -> Unit,
     onBackClick: () -> Unit,
     isLoading: Boolean = false,
     errorMessage: String? = null,
@@ -69,7 +68,6 @@ fun RegisterScreen(
     val (password, setPassword) = remember { mutableStateOf("") }
     val (name, setName) = remember { mutableStateOf("") }
     val (phone, setPhone) = remember { mutableStateOf("") }
-    val (isTutor, setIsTutor) = remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Box(
@@ -229,22 +227,6 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Tutor Checkbox
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = isTutor,
-                    onCheckedChange = { setIsTutor(it) }
-                )
-                Text(
-                    "I'm a tutor",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black
-                )
-            }
-
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -259,7 +241,7 @@ fun RegisterScreen(
 
             // Register Button
             Button(
-                onClick = { onRegisterClick(email, password, name, phone, isTutor) },
+                onClick = { onRegisterClick(email, password, name, phone) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
