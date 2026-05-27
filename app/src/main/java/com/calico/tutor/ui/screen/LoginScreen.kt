@@ -79,7 +79,7 @@ fun LoginScreen(
             if (!isOnline) {
                 Spacer(modifier = Modifier.height(24.dp))
                 OfflineBanner(
-                    message = "No internet connection. Please check your connection to continue.",
+                    message = "No tienes internet, conectate e intenta nuevamente.",
                     modifier = Modifier.padding(horizontal = 32.dp)
                 )
             }

@@ -95,7 +95,7 @@ fun RegisterScreen(
 
             if (!isOnline) {
                 OfflineBanner(
-                    message = "Internet connection is required to create an account.",
+                    message = "No tienes internet, conectate e intenta nuevamente.",
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
