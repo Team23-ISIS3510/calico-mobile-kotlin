@@ -97,7 +97,8 @@ class AuthRepositoryImpl(
                     "HTTP ${e.code()}"
                 }
             } else {
-                e.localizedMessage ?: "Google login failed"
+                // Use ErrorMessageMapper for network and other errors
+                com.calico.tutor.data.utils.ErrorMessageMapper.getErrorMessage(e)
             }
             Result.Error(e, backendMessage)
         }

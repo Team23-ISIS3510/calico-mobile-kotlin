@@ -141,7 +141,7 @@ class AuthViewModel(
                         }
                     }
                     AuthState.Error(
-                        result.message ?: "Google login failed",
+                        if (isNetworkError) NO_INTERNET_AUTH_MESSAGE else result.message ?: "Google login failed",
                         retryable = isNetworkError
                     )
                 }
