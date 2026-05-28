@@ -108,7 +108,7 @@ class AuthViewModel(
                         }
                     }
                     AuthState.Error(
-                        if (isNetworkError) NO_INTERNET_AUTH_MESSAGE else result.message ?: "Registration failed",
+                        if (isNetworkError) NO_INTERNET_AUTH_MESSAGE else (result.message ?: "Registration failed"),
                         retryable = isNetworkError
                     )
                 }

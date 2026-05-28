@@ -32,7 +32,21 @@ class AuthRepositoryImpl(
             Result.Success(authToken)
         } catch (e: Exception) {
             Log.e(TAG, "Error en login: ${e.message}", e)
-            Result.Error(e, e.localizedMessage ?: "Login failed")
+            val backendMessage = if (e is HttpException) {
+                try {
+                    val errorBody = e.response()?.errorBody()?.string().orEmpty()
+                    if (errorBody.isNotBlank()) {
+                        JSONObject(errorBody).optString("error", errorBody)
+                    } else {
+                        "HTTP ${e.code()}"
+                    }
+                } catch (_: Exception) {
+                    "HTTP ${e.code()}"
+                }
+            } else {
+                com.calico.tutor.data.utils.ErrorMessageMapper.getErrorMessage(e)
+            }
+            Result.Error(e, backendMessage)
         }
     }
 
@@ -62,7 +76,21 @@ class AuthRepositoryImpl(
             Result.Success(authToken)
         } catch (e: Exception) {
             Log.e(TAG, "Error en registro: ${e.message}", e)
-            Result.Error(e, e.localizedMessage ?: "Registration failed")
+            val backendMessage = if (e is HttpException) {
+                try {
+                    val errorBody = e.response()?.errorBody()?.string().orEmpty()
+                    if (errorBody.isNotBlank()) {
+                        JSONObject(errorBody).optString("error", errorBody)
+                    } else {
+                        "HTTP ${e.code()}"
+                    }
+                } catch (_: Exception) {
+                    "HTTP ${e.code()}"
+                }
+            } else {
+                com.calico.tutor.data.utils.ErrorMessageMapper.getErrorMessage(e)
+            }
+            Result.Error(e, backendMessage)
         }
     }
 
