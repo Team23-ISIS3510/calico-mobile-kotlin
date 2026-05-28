@@ -26,6 +26,8 @@ sealed class AuthState {
     data class Error(val message: String, val retryable: Boolean = true) : AuthState()
 }
 
+private const val NO_INTERNET_AUTH_MESSAGE = "You have no internet connection. Connect and try again."
+
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
@@ -71,7 +73,7 @@ class AuthViewModel(
                         }
                     }
                     AuthState.Error(
-                        result.message ?: "Login failed",
+                        if (isNetworkError) NO_INTERNET_AUTH_MESSAGE else result.message ?: "Login failed",
                         retryable = isNetworkError
                     )
                 }
@@ -106,7 +108,7 @@ class AuthViewModel(
                         }
                     }
                     AuthState.Error(
-                        result.message ?: "Registration failed",
+                        if (isNetworkError) NO_INTERNET_AUTH_MESSAGE else result.message ?: "Registration failed",
                         retryable = isNetworkError
                     )
                 }
